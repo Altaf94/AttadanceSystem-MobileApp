@@ -1,0 +1,80 @@
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  role?: string;
+  service?: string;
+  serviceUnit?: string;
+  active?: boolean;
+}
+
+export interface EventItem {
+  id: string;
+  occasion: string;
+  category: string;
+}
+
+export interface CheckIn {
+  id: string;
+  volunteerId: string;
+  volunteerName: string;
+  event: string;
+  service?: string | null;
+  serviceUnit?: string | null;
+  checkinAt: string;
+  checkinAtClient?: string | null;
+}
+
+export interface LastAttendance {
+  volunteerId: string;
+  volunteerName: string;
+  action: string;
+  time?: string;
+}
+
+export interface ReportSummary {
+  totalCheckins: number;
+  uniqueVolunteers: number;
+  totalEvents: number;
+  todayCheckins: number;
+}
+
+export interface ReportData {
+  summary: ReportSummary;
+  eventStats: { name: string; count: number }[];
+  serviceStats: { name: string; count: number }[];
+  dailyStats: { date: string; count: number }[];
+  hourlyStats: { hour: string; count: number }[];
+  topVolunteers: { volunteerId: string; volunteerName: string; count: number }[];
+  categoryStats: { name: string; count: number }[];
+  checkins: CheckIn[];
+  filters: {
+    events: string[];
+    services: string[];
+  };
+}
+
+export interface QRPayload {
+  volunteerId: string;
+  volunteerName: string;
+  cnic?: string;
+}
+
+export type RootStackParamList = {
+  Login: undefined;
+  Dashboard: undefined;
+  CheckIn: { 
+    event?: string;
+    scannedData?: {
+      volunteerId: string;
+      volunteerName: string;
+      cnic?: string;
+    };
+  };
+  RegisterUser: undefined;
+  Reports: undefined;
+  AddEvent: undefined;
+  ManageEvents: undefined;
+  GenerateQR: undefined;
+  QRScanner: { event: string };
+};
