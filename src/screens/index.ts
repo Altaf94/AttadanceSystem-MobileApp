@@ -7,3 +7,5 @@ export { default as AddEventScreen } from './AddEventScreen';
 export { default as ManageEventsScreen } from './ManageEventsScreen';
 export { default as GenerateQRScreen } from './GenerateQRScreen';
 export { default as QRScannerScreen } from './QRScannerScreen';
+export { default as UserManagementScreen } from './UserManagementScreen';
+export { default as BackdatedAttendanceScreen } from './BackdatedAttendanceScreen';

@@ -9,9 +9,11 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
+import { checkForUpdate, UpdateFlow } from 'react-native-in-app-updates';
 import { RootStackParamList, User, LastAttendance } from '../types';
 import {
   COLORS,
@@ -40,6 +42,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedService, setSelectedService] = useState('');
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [lastAttendance, setLastAttendance] = useState<LastAttendance | null>(null);
+  const [hasCheckedUpdate, setHasCheckedUpdate] = useState(false);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -82,11 +85,22 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, []);
 
+  const checkInAppUpdate = useCallback(() => {
+    if (Platform.OS !== 'android' || hasCheckedUpdate) {
+      return;
+    }
+    setHasCheckedUpdate(true);
+    checkForUpdate(UpdateFlow.FLEXIBLE).catch(error => {
+      console.log('In-app update check failed:', error?.message || error);
+    });
+  }, [hasCheckedUpdate]);
+
   useFocusEffect(
     useCallback(() => {
       loadUserData();
       loadOccasions();
-    }, [loadUserData, loadOccasions])
+      checkInAppUpdate();
+    }, [loadUserData, loadOccasions, checkInAppUpdate])
   );
 
   const handleLogout = async () => {
@@ -213,6 +227,34 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.adminCardIcon}>📱</Text>
                   <Text style={styles.adminCardTitle}>Generate QR</Text>
                   <Text style={styles.adminCardSubtitle}>Create volunteer QR codes</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.adminCard}
+                onPress={() => navigation.navigate('UserManagement')}
+              >
+                <LinearGradient
+                  colors={['#1abc9c', '#16a085']}
+                  style={styles.adminCardGradient}
+                >
+                  <Text style={styles.adminCardIcon}>👥</Text>
+                  <Text style={styles.adminCardTitle}>User Management</Text>
+                  <Text style={styles.adminCardSubtitle}>View & manage users</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.adminCard}
+                onPress={() => navigation.navigate('BackdatedAttendance')}
+              >
+                <LinearGradient
+                  colors={['#9b59b6', '#8e44ad']}
+                  style={styles.adminCardGradient}
+                >
+                  <Text style={styles.adminCardIcon}>⏪</Text>
+                  <Text style={styles.adminCardTitle}>Backdated Attendance</Text>
+                  <Text style={styles.adminCardSubtitle}>Record past attendance</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

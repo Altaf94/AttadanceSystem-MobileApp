@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   FlatList,
+  Share,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Picker } from '@react-native-picker/picker';
@@ -35,7 +36,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'checkins'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'volunteers' | 'events'>('overview');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +90,54 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
     setSelectedService('');
     setSearchQuery('');
     setCurrentPage(1);
+  };
+
+  const handleShareCsv = async () => {
+    if (!data || !data.checkins.length) {
+      Alert.alert('No Data', 'There are no check-ins to export.');
+      return;
+    }
+
+    try {
+      const headers = [
+        'Volunteer ID',
+        'Volunteer Name',
+        'Event',
+        'Service',
+        'Service Unit',
+        'Check-in Time',
+        'Recorded By',
+      ];
+
+      const rows = data.checkins.map((c) => [
+        c.volunteerId,
+        c.volunteerName,
+        c.event,
+        c.service || '',
+        c.serviceUnit || '',
+        c.checkinAtClient || formatDate(c.checkinAt),
+        // @ts-ignore takenByUserName comes from backend but is not part of CheckIn type
+        c.takenByUserName || '',
+      ]);
+
+      const csvContent = [headers, ...rows]
+        .map((row) =>
+          row
+            .map((cell) => {
+              const value = (cell ?? '').toString().replace(/"/g, '""');
+              return `"${value}"`;
+            })
+            .join(',')
+        )
+        .join('\n');
+
+      await Share.share({
+        title: 'Attendance Report',
+        message: csvContent,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share CSV report.');
+    }
   };
 
   const paginatedCheckins = data?.checkins.slice(
@@ -148,12 +197,21 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.headerTitle}>Attendance Reports</Text>
             <Text style={styles.headerSubtitle}>Detailed analytics and insights</Text>
           </View>
-          <TouchableOpacity
-            style={styles.backTouchable}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backTouchableText}>← Back</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.exportButton, !data?.checkins.length && styles.exportButtonDisabled]}
+              onPress={handleShareCsv}
+              disabled={!data?.checkins.length}
+            >
+              <Text style={styles.exportButtonText}>📊 Export CSV</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backTouchable}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backTouchableText}>← Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Filters */}
@@ -238,6 +296,22 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Text style={[styles.tabText, activeTab === 'checkins' && styles.activeTabText]}>
               📋 Check-ins
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'volunteers' && styles.activeTab]}
+            onPress={() => setActiveTab('volunteers')}
+          >
+            <Text style={[styles.tabText, activeTab === 'volunteers' && styles.activeTabText]}>
+              👥 Volunteers
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'events' && styles.activeTab]}
+            onPress={() => setActiveTab('events')}
+          >
+            <Text style={[styles.tabText, activeTab === 'events' && styles.activeTabText]}>
+              🗓️ Events
             </Text>
           </TouchableOpacity>
         </View>
@@ -356,6 +430,63 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 )}
               </View>
             )}
+
+            {/* Volunteers Tab */}
+            {activeTab === 'volunteers' && (
+              <View style={styles.volunteersContainer}>
+                <Text style={styles.statsTitle}>Top Volunteers</Text>
+                {data.topVolunteers.length === 0 && (
+                  <Text style={styles.emptyText}>No volunteer data available.</Text>
+                )}
+                {data.topVolunteers.map((vol, index) => (
+                  <View key={vol.volunteerId} style={styles.statsRow}>
+                    <Text style={styles.statsRank}>#{index + 1}</Text>
+                    <View style={styles.statsInfo}>
+                      <Text style={styles.statsName}>{vol.volunteerName}</Text>
+                      <Text style={styles.statsId}>{vol.volunteerId}</Text>
+                    </View>
+                    <Text style={styles.statsCount}>{vol.count}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Events Tab */}
+            {activeTab === 'events' && (
+              <View style={styles.eventsContainer}>
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsTitle}>🗓️ Check-ins by Event</Text>
+                  {data.eventStats.length === 0 && (
+                    <Text style={styles.emptyText}>No event data available.</Text>
+                  )}
+                  {data.eventStats.map((event, index) => (
+                    <View key={event.name} style={styles.statsRow}>
+                      <Text style={styles.statsRank}>#{index + 1}</Text>
+                      <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
+                        {event.name}
+                      </Text>
+                      <Text style={styles.statsCount}>{event.count}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsTitle}>📂 Check-ins by Category</Text>
+                  {data.categoryStats.length === 0 && (
+                    <Text style={styles.emptyText}>No category data available.</Text>
+                  )}
+                  {data.categoryStats.map((cat, index) => (
+                    <View key={cat.name} style={styles.statsRow}>
+                      <Text style={styles.statsRank}>#{index + 1}</Text>
+                      <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
+                        {cat.name}
+                      </Text>
+                      <Text style={styles.statsCount}>{cat.count}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -434,6 +565,25 @@ const styles = StyleSheet.create({
   backTouchableText: {
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  exportButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+  },
+  exportButtonDisabled: {
+    backgroundColor: COLORS.lightGray,
+  },
+  exportButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 12,
   },
   filtersCard: {
     backgroundColor: COLORS.white,
@@ -660,6 +810,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
     marginBottom: 12,
+  },
+  volunteersContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginTop: 16,
+  },
+  eventsContainer: {
+    marginTop: 16,
+    rowGap: 16,
   },
   checkInItem: {
     paddingVertical: 12,

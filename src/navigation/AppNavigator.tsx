@@ -15,6 +15,8 @@ import {
   ManageEventsScreen,
   GenerateQRScreen,
   QRScannerScreen,
+  UserManagementScreen,
+  BackdatedAttendanceScreen,
 } from '../screens';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -114,6 +116,20 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name="QRScanner"
           component={QRScannerScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="UserManagement"
+          component={UserManagementScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="BackdatedAttendance"
+          component={BackdatedAttendanceScreen}
           options={{
             headerShown: false,
           }}

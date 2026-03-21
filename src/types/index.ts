@@ -60,6 +60,18 @@ export interface QRPayload {
   cnic?: string;
 }
 
+// User Management Types
+export interface UserListItem {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  active: boolean;
+  service: string | null;
+  serviceUnit: string | null;
+  createdAt: string;
+}
+
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
@@ -77,4 +89,6 @@ export type RootStackParamList = {
   ManageEvents: undefined;
   GenerateQR: undefined;
   QRScanner: { event: string };
+  UserManagement: undefined;
+  BackdatedAttendance: undefined;
 };

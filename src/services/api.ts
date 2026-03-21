@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../constants';
-import { User, EventItem, ReportData } from '../types';
+import { User, EventItem, ReportData, UserListItem } from '../types';
 
 // Helper function for API calls
 const apiCall = async <T>(
@@ -104,4 +104,25 @@ export const fetchReports = async (params?: {
   
   const queryString = searchParams.toString();
   return apiCall(`/api/reports${queryString ? `?${queryString}` : ''}`);
+};
+
+// User Management APIs
+export const fetchUsers = async (): Promise<UserListItem[]> => {
+  return apiCall('/api/users');
+};
+
+export const updateUserPassword = async (
+  userId: string,
+  password: string
+): Promise<{ message: string }> => {
+  return apiCall(`/api/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  });
+};
+
+export const deleteUser = async (userId: string): Promise<{ message: string }> => {
+  return apiCall(`/api/users/${userId}`, {
+    method: 'DELETE',
+  });
 };

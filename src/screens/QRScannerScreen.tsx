@@ -4,26 +4,56 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from 'react-native';
 import {Camera, useCameraDevice, useCodeScanner} from 'react-native-vision-camera';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types';
-import {parseQrPayload} from '../utils';
+import {parseQrPayload, getUser, getPakistanTime} from '../utils';
+import {submitCheckIn} from '../services/api';
 
 type QRScannerScreenProps = NativeStackScreenProps<RootStackParamList, 'QRScanner'>;
+
+interface CheckInResult {
+  success: boolean;
+  volunteerName: string;
+  volunteerId: string;
+  action: string;
+  time: string;
+  errorMessage?: string;
+}
 
 const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) => {
   const [processingQR, setProcessingQR] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [torchOn, setTorchOn] = useState(false);
+  const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
+  const [userId, setUserId] = useState<string>('');
+  const [userService, setUserService] = useState<string | null>(null);
+  const [userServiceUnit, setUserServiceUnit] = useState<string | null>(null);
   const scannedRef = useRef(false);
   const device = useCameraDevice('back');
 
   useEffect(() => {
     checkCameraPermission();
+    loadUserData();
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const user = await getUser();
+      if (user) {
+        setUserId(user.id);
+        setUserService(user.service || null);
+        setUserServiceUnit(user.serviceUnit || null);
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
 
   const checkCameraPermission = async () => {
     try {
@@ -60,7 +90,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
     },
   });
 
-  const processQRCode = (qrData: string) => {
+  const processQRCode = async (qrData: string) => {
     try {
       // Parse the QR code data (format: volunteerId|volunteerName|cnic)
       const parsedData = parseQrPayload(qrData);
@@ -69,28 +99,64 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
         throw new Error('Invalid QR code format');
       }
 
-      // Navigate back to CheckInScreen with the scanned data
-      navigation.navigate('CheckIn', {
-        event: route.params?.event,
-        scannedData: {
-          volunteerId: parsedData.volunteerId,
-          volunteerName: parsedData.volunteerName || '',
-          cnic: parsedData.cnic || '',
-        },
+      const { volunteerId, volunteerName } = parsedData;
+      const event = route.params?.event;
+
+      if (!event) {
+        throw new Error('Event not specified');
+      }
+
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+
+      // Call the check-in API directly
+      const actionDate = new Date();
+      const localTimeFormatted = getPakistanTime(actionDate);
+
+      const response = await submitCheckIn({
+        volunteerId,
+        volunteerName: volunteerName || '',
+        event,
+        takenByUserId: userId,
+        service: userService || undefined,
+        serviceUnit: userServiceUnit || undefined,
+        actionAt: actionDate.toISOString(),
+        actionAtClient: localTimeFormatted,
       });
+
+      const action = response?.action === 'checked_out' ? 'Checked Out' : 'Checked In';
+      const currentTime = getPakistanTime(actionDate);
+
+      // Show success result
+      setCheckInResult({
+        success: true,
+        volunteerName: volunteerName || volunteerId,
+        volunteerId,
+        action,
+        time: currentTime,
+      });
+      setProcessingQR(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Invalid QR code';
-      Alert.alert('Error', `${errorMessage}. Please try again.`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            scannedRef.current = false;
-            setProcessingQR(false);
-            setIsActive(true);
-          },
-        },
-      ]);
+      const errorMessage = error instanceof Error ? error.message : 'Check-in failed';
+      setCheckInResult({
+        success: false,
+        volunteerName: '',
+        volunteerId: '',
+        action: '',
+        time: '',
+        errorMessage,
+      });
+      setProcessingQR(false);
     }
+  };
+
+  const handleDismissResult = () => {
+    // Reset everything to continue scanning
+    setCheckInResult(null);
+    scannedRef.current = false;
+    setProcessingQR(false);
+    setIsActive(true);
   };
 
   const handleRetry = () => {
@@ -127,6 +193,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={isActive}
+        torch={torchOn ? 'on' : 'off'}
         codeScanner={codeScanner}
       />
 
@@ -155,14 +222,21 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
             Position the QR code within the frame
           </Text>
 
+          <TouchableOpacity
+            style={[styles.flashButton, torchOn && styles.flashButtonOn]}
+            onPress={() => setTorchOn(prev => !prev)}
+          >
+            <Text style={styles.flashButtonText}>{torchOn ? 'Flashlight ON' : 'Flashlight OFF'}</Text>
+          </TouchableOpacity>
+
           {processingQR && (
             <View style={styles.processingContainer}>
               <ActivityIndicator size="large" color="#ffffff" />
-              <Text style={styles.processingText}>Processing QR Code...</Text>
+              <Text style={styles.processingText}>Processing Check-in...</Text>
             </View>
           )}
 
-          {!isActive && !processingQR && (
+          {!isActive && !processingQR && !checkInResult && (
             <TouchableOpacity
               style={styles.retryButton}
               onPress={handleRetry}
@@ -172,6 +246,48 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
           )}
         </View>
       </View>
+
+      {/* Result Card Modal */}
+      <Modal
+        visible={checkInResult !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleDismissResult}
+      >
+        <View style={styles.modalOverlay}>
+          {checkInResult?.success ? (
+            <View style={styles.resultCard}>
+              <View style={styles.successIcon}>
+                <Text style={styles.successIconText}>✓</Text>
+              </View>
+              <Text style={styles.resultName}>{checkInResult.volunteerName}</Text>
+              <Text style={styles.resultId}>{checkInResult.volunteerId}</Text>
+              <Text style={styles.resultAction}>{checkInResult.action}</Text>
+              <Text style={styles.resultTime}>{checkInResult.time}</Text>
+              <TouchableOpacity
+                style={styles.okButton}
+                onPress={handleDismissResult}
+              >
+                <Text style={styles.okButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.resultCard}>
+              <View style={styles.errorIcon}>
+                <Text style={styles.errorIconText}>✕</Text>
+              </View>
+              <Text style={styles.errorTitle}>Check-in Failed</Text>
+              <Text style={styles.errorMessage}>{checkInResult?.errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.okButton}
+                onPress={handleDismissResult}
+              >
+                <Text style={styles.okButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -297,6 +413,120 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  flashButton: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffffffaa',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  flashButtonOn: {
+    backgroundColor: 'rgba(255, 215, 0, 0.9)',
+    borderColor: '#ffd700',
+  },
+  flashButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  resultCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+    width: '90%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#27ae60',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  successIconText: {
+    fontSize: 36,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  errorIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorIconText: {
+    fontSize: 36,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  resultName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  resultId: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginBottom: 16,
+  },
+  resultAction: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#27ae60',
+    marginBottom: 4,
+  },
+  resultTime: {
+    fontSize: 14,
+    color: '#95a5a6',
+    marginBottom: 24,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#e74c3c',
+    marginBottom: 12,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  okButton: {
+    backgroundColor: '#3498db',
+    paddingVertical: 14,
+    paddingHorizontal: 50,
+    borderRadius: 8,
+  },
+  okButtonText: {
+    fontSize: 18,
     color: '#fff',
     fontWeight: '600',
   },
