@@ -30,5 +30,14 @@ target 'Attandance' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    
+    # Add vector icons fonts to iOS bundle
+    installer.pods_project.targets.each do |target|
+      if target.name == 'react-native-vector-icons'
+        target.build_configurations.each do |config|
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+        end
+      end
+    end
   end
 end

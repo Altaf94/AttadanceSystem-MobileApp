@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { createEvent } from '../services/api';
+import { DateTimePicker, Icon } from '../components';
 
 type AddEventScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddEvent'>;
 
@@ -25,9 +27,25 @@ const AddEventScreen: React.FC<Props> = ({ navigation }) => {
   const [passcode, setPasscode] = useState('');
   const [isPasscodeVerified, setIsPasscodeVerified] = useState(false);
   const [title, setTitle] = useState('');
+  const [eventDate, setEventDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
+
+  const formatDateTime = (date: Date) => {
+    const dateStr = date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${dateStr} at ${timeStr}`;
+  };
 
   const handlePasscodeSubmit = () => {
     setPasscodeError(null);
@@ -69,7 +87,7 @@ const AddEventScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
           <View style={styles.card}>
@@ -114,47 +132,71 @@ const AddEventScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>Add Occasion</Text>
-          <Text style={styles.subtitle}>
-            Create a new occasion to use when checking in volunteers.
-          </Text>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            <Text style={styles.title}>Add Occasion</Text>
+            <Text style={styles.subtitle}>
+              Create a new occasion to use when checking in volunteers.
+            </Text>
 
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Occasion title"
-              placeholderTextColor={COLORS.gray}
-              value={title}
-              onChangeText={setTitle}
-            />
+            <View style={styles.form}>
+              <TextInput
+                style={styles.input}
+                placeholder="Occasion title"
+                placeholderTextColor={COLORS.gray}
+                value={title}
+                onChangeText={setTitle}
+              />
 
-            {error && <Text style={styles.errorText}>{error}</Text>}
-
-            <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
+                style={styles.datePickerButton}
+                onPress={() => setShowDatePicker(true)}
               >
-                {loading ? (
-                  <ActivityIndicator color={COLORS.white} size="small" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Add Occasion</Text>
-                )}
+                <Icon name="event" size={22} color={COLORS.gray} family="material" />
+                <Text style={eventDate ? styles.datePickerText : styles.datePickerPlaceholder}>
+                  {eventDate ? formatDateTime(eventDate) : 'Select Date & Time'}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+
+              <DateTimePicker
+                visible={showDatePicker}
+                onClose={() => setShowDatePicker(false)}
+                onSelectDateTime={(date) => {
+                  setEventDate(date);
+                }}
+                initialDate={eventDate || undefined}
+              />
+
+              {error && <Text style={styles.errorText}>{error}</Text>}
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                  onPress={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={COLORS.white} size="small" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Add Occasion</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -168,7 +210,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   keyboardView: {
+    flex: 1,
     width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
@@ -207,6 +254,26 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
     color: COLORS.black,
     fontSize: 16,
+  },
+  datePickerButton: {
+    backgroundColor: COLORS.white,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  datePickerText: {
+    color: COLORS.black,
+    fontSize: 16,
+    flex: 1,
+  },
+  datePickerPlaceholder: {
+    color: COLORS.gray,
+    fontSize: 16,
+    flex: 1,
   },
   errorText: {
     color: COLORS.danger,

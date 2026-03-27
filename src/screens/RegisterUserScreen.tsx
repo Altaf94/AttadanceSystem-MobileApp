@@ -19,6 +19,7 @@ import { RootStackParamList } from '../types';
 import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
 import { registerUser } from '../services/api';
 import { getUser, isAdmin } from '../utils';
+import { Icon } from '../components';
 
 type RegisterUserScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'RegisterUser'>;
 
@@ -112,10 +113,13 @@ const RegisterUserScreen: React.FC<Props> = ({ navigation }) => {
       style={styles.container}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.card}>
             {/* Logo Section */}
             <View style={styles.logoSection}>
@@ -163,8 +167,14 @@ const RegisterUserScreen: React.FC<Props> = ({ navigation }) => {
                   <TouchableOpacity
                     style={styles.eyeButton}
                     onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    <Icon 
+                      name={showPassword ? 'visibility' : 'visibility-off'} 
+                      size={22} 
+                      color={COLORS.gray} 
+                      family="material" 
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -346,6 +356,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
     color: COLORS.black,
     fontSize: 14,
+    height: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -354,15 +365,21 @@ const styles = StyleSheet.create({
   },
   passwordContainer: {
     position: 'relative',
+    justifyContent: 'center',
+    height: 50,
   },
   passwordInput: {
     paddingRight: 50,
+    height: 50,
   },
   eyeButton: {
     position: 'absolute',
     right: 12,
-    top: 14,
-    padding: 4,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
   },
   eyeIcon: {
     fontSize: 18,

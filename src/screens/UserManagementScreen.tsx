@@ -10,11 +10,13 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, UserListItem } from '../types';
-import { COLORS } from '../constants';
-import { fetchUsers, updateUserPassword, deleteUser } from '../services/api';
+import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
+import { fetchUsers, updateUserPassword, deleteUser, updateUserService } from '../services/api';
 import { getUser, isAdmin } from '../utils';
+import { Icon } from '../components';
 
 type UserManagementScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'UserManagement'>;
 
@@ -33,6 +35,13 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Service editing modal state
+  const [editingServiceUser, setEditingServiceUser] = useState<UserListItem | null>(null);
+  const [selectedServiceUnit, setSelectedServiceUnit] = useState('');
+  const [selectedService, setSelectedService] = useState('');
+  const [savingService, setSavingService] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -110,11 +119,38 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('Success', 'Password updated successfully');
       setEditingUser(null);
       setNewPassword('');
+      setShowPassword(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update password';
       Alert.alert('Error', message);
     } finally {
       setSavingPassword(false);
+    }
+  };
+
+  const handleServiceChange = async () => {
+    if (!editingServiceUser || !selectedServiceUnit || !selectedService) {
+      Alert.alert('Error', 'Please select both Service Unit and Service');
+      return;
+    }
+
+    setSavingService(true);
+    try {
+      await updateUserService(editingServiceUser.id, selectedServiceUnit, selectedService);
+      Alert.alert('Success', 'Service updated successfully');
+      setUsers(prev => prev.map(u => 
+        u.id === editingServiceUser.id 
+          ? { ...u, serviceUnit: selectedServiceUnit, service: selectedService }
+          : u
+      ));
+      setEditingServiceUser(null);
+      setSelectedServiceUnit('');
+      setSelectedService('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update service';
+      Alert.alert('Error', message);
+    } finally {
+      setSavingService(false);
     }
   };
 
@@ -244,6 +280,17 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        style={styles.editServiceButton}
+                        onPress={() => {
+                          setEditingServiceUser(user);
+                          setSelectedServiceUnit(user.serviceUnit || '');
+                          setSelectedService(user.service || '');
+                        }}
+                      >
+                        <Text style={styles.editServiceButtonText}>Service</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
                         style={[
                           styles.deleteButton,
                           (isDeleting || isCurrentUser) && styles.deleteButtonDisabled,
@@ -276,6 +323,7 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
         onRequestClose={() => {
           setEditingUser(null);
           setNewPassword('');
+          setShowPassword(false);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -287,15 +335,28 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
               {editingUser?.name || editingUser?.email}
             </Text>
             
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Enter new password (min 6 chars)"
-              placeholderTextColor={COLORS.gray}
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-              autoCapitalize="none"
-            />
+            <View style={styles.passwordInputContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Enter new password (min 6 chars)"
+                placeholderTextColor={COLORS.gray}
+                secureTextEntry={!showPassword}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Icon
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={COLORS.gray}
+                  family="feather"
+                />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -303,6 +364,7 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => {
                   setEditingUser(null);
                   setNewPassword('');
+                  setShowPassword(false);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -317,6 +379,94 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={savingPassword || newPassword.trim().length < 6}
               >
                 {savingPassword ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <Text style={styles.updateButtonText}>Update</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Service Editing Modal */}
+      <Modal
+        visible={!!editingServiceUser}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setEditingServiceUser(null);
+          setSelectedServiceUnit('');
+          setSelectedService('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Edit Service
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {editingServiceUser?.name || editingServiceUser?.email}
+            </Text>
+            
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Service Unit</Text>
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={selectedServiceUnit}
+                  onValueChange={(itemValue) => {
+                    setSelectedServiceUnit(itemValue);
+                    setSelectedService('');
+                  }}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Service Unit" value="" />
+                  {SERVICE_UNIT_OPTIONS.map((unit) => (
+                    <Picker.Item key={unit} label={unit} value={unit} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {selectedServiceUnit && (
+              <View style={styles.pickerContainer}>
+                <Text style={styles.pickerLabel}>Service</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={selectedService}
+                    onValueChange={setSelectedService}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select Service" value="" />
+                    {SERVICE_OPTIONS[selectedServiceUnit]?.map((service) => (
+                      <Picker.Item key={service} label={service} value={service} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setEditingServiceUser(null);
+                  setSelectedServiceUnit('');
+                  setSelectedService('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.updateButton,
+                  (!selectedServiceUnit || !selectedService) && styles.updateButtonDisabled,
+                ]}
+                onPress={handleServiceChange}
+                disabled={savingService || !selectedServiceUnit || !selectedService}
+              >
+                {savingService ? (
                   <ActivityIndicator color={COLORS.white} size="small" />
                 ) : (
                   <Text style={styles.updateButtonText}>Update</Text>
@@ -529,6 +679,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
+  editServiceButton: {
+    backgroundColor: '#9b59b6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  editServiceButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 12,
+  },
   deleteButton: {
     backgroundColor: COLORS.danger,
     paddingHorizontal: 12,
@@ -571,14 +733,26 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginBottom: 20,
   },
+  passwordInputContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   passwordInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
     borderRadius: 8,
     padding: 14,
     fontSize: 16,
     color: COLORS.textPrimary,
-    marginBottom: 20,
+    paddingRight: 45,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 12,
+    padding: 8,
   },
   modalActions: {
     flexDirection: 'row',
@@ -610,6 +784,25 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '600',
     fontSize: 16,
+  },
+  pickerContainer: {
+    marginBottom: 16,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+    color: COLORS.textPrimary,
   },
 });
 

@@ -16,6 +16,7 @@ interface DateTimePickerProps {
   onClose: () => void;
   onSelectDateTime: (date: Date) => void;
   initialDate?: Date;
+  dateOnly?: boolean;
 }
 
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
@@ -23,6 +24,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   onClose,
   onSelectDateTime,
   initialDate,
+  dateOnly = false,
 }) => {
   const now = new Date();
   const currentDate = initialDate || new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -260,6 +262,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const formatSelectedDateTime = () => {
     const dateStr = selectedDate.toLocaleDateString('en-GB');
+    if (dateOnly) {
+      return dateStr;
+    }
     const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
     return `${dateStr}, ${timeStr}`;
   };
@@ -277,13 +282,13 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Date & Time</Text>
+            <Text style={styles.modalTitle}>{dateOnly ? 'Select Date' : 'Select Date & Time'}</Text>
             <View style={{ width: 30 }} />
           </View>
 
           <ScrollView contentContainerStyle={styles.pickerContainer}>
             {renderCalendar()}
-            {renderTimePicker()}
+            {!dateOnly && renderTimePicker()}
 
             <View style={styles.selectedDisplay}>
               <Text style={styles.selectedLabel}>Selected:</Text>

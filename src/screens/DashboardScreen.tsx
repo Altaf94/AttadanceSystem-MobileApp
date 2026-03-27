@@ -674,10 +674,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
+    backgroundColor: 'transparent',
   },
   adminCardGradient: {
+    flex: 1,
     padding: 20,
     alignItems: 'center',
+    minHeight: 120,
   },
   adminCardIcon: {
     fontSize: 32,

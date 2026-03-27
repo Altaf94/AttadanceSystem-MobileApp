@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DateTimePicker } from '../components';
 import {
   View,
   Text,
@@ -33,6 +34,8 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   // Filters
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +44,15 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  const getGenderFromVolunteerId = (volunteerId: string): 'Male' | 'Female' | 'Unknown' => {
+    if (!volunteerId) return 'Unknown';
+    const parts = volunteerId.split('.');
+    const genderCode = parts.find((p) => p === 'M' || p === 'F');
+    if (genderCode === 'M') return 'Male';
+    if (genderCode === 'F') return 'Female';
+    return 'Unknown';
+  };
 
   useEffect(() => {
     checkAdminAccess();
@@ -146,6 +158,25 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   ) || [];
   const totalPages = data ? Math.ceil(data.checkins.length / itemsPerPage) : 0;
 
+  const genderStats = useMemo(() => {
+    if (!data) {
+      return { male: 0, female: 0, unknown: 0 };
+    }
+
+    let male = 0;
+    let female = 0;
+    let unknown = 0;
+
+    data.checkins.forEach((checkin) => {
+      const gender = getGenderFromVolunteerId(checkin.volunteerId);
+      if (gender === 'Male') male += 1;
+      else if (gender === 'Female') female += 1;
+      else unknown += 1;
+    });
+
+    return { male, female, unknown };
+  }, [data]);
+
   if (isUserAdmin === null) {
     return (
       <View style={styles.loadingContainer}>
@@ -185,6 +216,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
       {item.service && (
         <Text style={styles.checkInService}>{item.service}</Text>
       )}
+      <Text style={styles.checkInGender}>{getGenderFromVolunteerId(item.volunteerId)}</Text>
     </View>
   );
 
@@ -219,21 +251,42 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.filtersTitle}>Filters & Search</Text>
           <View style={styles.filtersGrid}>
             <View style={styles.filterRow}>
-              <TextInput
+              <TouchableOpacity
                 style={[styles.filterInput, styles.filterInputHalf]}
-                placeholder="Start Date (YYYY-MM-DD)"
-                placeholderTextColor={COLORS.gray}
-                value={startDate}
-                onChangeText={setStartDate}
-              />
-              <TextInput
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text style={startDate ? styles.dateText : styles.datePlaceholder}>
+                  {startDate || 'Start Date'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.filterInput, styles.filterInputHalf]}
-                placeholder="End Date (YYYY-MM-DD)"
-                placeholderTextColor={COLORS.gray}
-                value={endDate}
-                onChangeText={setEndDate}
-              />
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={endDate ? styles.dateText : styles.datePlaceholder}>
+                  {endDate || 'End Date'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            <DateTimePicker
+              visible={showStartDatePicker}
+              onClose={() => setShowStartDatePicker(false)}
+              onSelectDateTime={(date) => {
+                const formatted = date.toISOString().split('T')[0];
+                setStartDate(formatted);
+              }}
+              dateOnly
+            />
+            <DateTimePicker
+              visible={showEndDatePicker}
+              onClose={() => setShowEndDatePicker(false)}
+              onSelectDateTime={(date) => {
+                const formatted = date.toISOString().split('T')[0];
+                setEndDate(formatted);
+              }}
+              dateOnly
+            />
 
             <View style={styles.pickerContainer}>
               <Picker
@@ -242,8 +295,8 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.picker}
               >
                 <Picker.Item label="All Events" value="" />
-                {data?.filters.events.map(e => (
-                  <Picker.Item key={e} label={e} value={e} />
+                {Array.from(new Set(data?.filters.events)).map((e, idx) => (
+                  <Picker.Item key={`event-${idx}`} label={e} value={e} />
                 ))}
               </Picker>
             </View>
@@ -255,8 +308,8 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.picker}
               >
                 <Picker.Item label="All Services" value="" />
-                {data?.filters.services.map(s => (
-                  <Picker.Item key={s} label={s} value={s} />
+                {Array.from(new Set(data?.filters.services)).map((s, idx) => (
+                  <Picker.Item key={`service-${idx}`} label={s} value={s} />
                 ))}
               </Picker>
             </View>
@@ -286,32 +339,36 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
             style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
             onPress={() => setActiveTab('overview')}
           >
+            <Text style={styles.tabIcon}>📈</Text>
             <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-              📈 Overview
+              Overview
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'checkins' && styles.activeTab]}
             onPress={() => setActiveTab('checkins')}
           >
+            <Text style={styles.tabIcon}>📋</Text>
             <Text style={[styles.tabText, activeTab === 'checkins' && styles.activeTabText]}>
-              📋 Check-ins
+              Check-ins
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'volunteers' && styles.activeTab]}
             onPress={() => setActiveTab('volunteers')}
           >
+            <Text style={styles.tabIcon}>👥</Text>
             <Text style={[styles.tabText, activeTab === 'volunteers' && styles.activeTabText]}>
-              👥 Volunteers
+              Volunteers
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'events' && styles.activeTab]}
             onPress={() => setActiveTab('events')}
           >
+            <Text style={styles.tabIcon}>🗓️</Text>
             <Text style={[styles.tabText, activeTab === 'events' && styles.activeTabText]}>
-              🗓️ Events
+              Events
             </Text>
           </TouchableOpacity>
         </View>
@@ -377,7 +434,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.statsCard}>
                   <Text style={styles.statsTitle}>🗓️ Check-ins by Event</Text>
                   {data.eventStats.slice(0, 5).map((event, index) => (
-                    <View key={event.name} style={styles.statsRow}>
+                    <View key={`${event.name}-${index}`} style={styles.statsRow}>
                       <Text style={styles.statsRank}>#{index + 1}</Text>
                       <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
                         {event.name}
@@ -385,6 +442,24 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                       <Text style={styles.statsCount}>{event.count}</Text>
                     </View>
                   ))}
+                </View>
+
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsTitle}>👤 Gender Breakdown (by Check-ins)</Text>
+                  <View style={styles.statsRow}>
+                    <Text style={styles.statsName}>Male (M)</Text>
+                    <Text style={styles.statsCount}>{genderStats.male}</Text>
+                  </View>
+                  <View style={styles.statsRow}>
+                    <Text style={styles.statsName}>Female (F)</Text>
+                    <Text style={styles.statsCount}>{genderStats.female}</Text>
+                  </View>
+                  {genderStats.unknown > 0 && (
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statsName}>Unknown</Text>
+                      <Text style={styles.statsCount}>{genderStats.unknown}</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             )}
@@ -460,7 +535,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                     <Text style={styles.emptyText}>No event data available.</Text>
                   )}
                   {data.eventStats.map((event, index) => (
-                    <View key={event.name} style={styles.statsRow}>
+                    <View key={`${event.name}-${index}`} style={styles.statsRow}>
                       <Text style={styles.statsRank}>#{index + 1}</Text>
                       <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
                         {event.name}
@@ -476,7 +551,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                     <Text style={styles.emptyText}>No category data available.</Text>
                   )}
                   {data.categoryStats.map((cat, index) => (
-                    <View key={cat.name} style={styles.statsRow}>
+                    <View key={`${cat.name}-${index}`} style={styles.statsRow}>
                       <Text style={styles.statsRank}>#{index + 1}</Text>
                       <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
                         {cat.name}
@@ -621,14 +696,24 @@ const styles = StyleSheet.create({
   filterInputHalf: {
     flex: 1,
   },
+  dateText: {
+    color: COLORS.black,
+    fontSize: 14,
+  },
+  datePlaceholder: {
+    color: COLORS.gray,
+    fontSize: 14,
+  },
   pickerContainer: {
     backgroundColor: COLORS.white,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
+    height: 50,
+    justifyContent: 'center',
   },
   picker: {
-    height: 44,
+    height: 50,
     color: COLORS.black,
   },
   filterActions: {
@@ -672,15 +757,22 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 6,
   },
   activeTab: {
     backgroundColor: COLORS.primary,
   },
+  tabIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     color: COLORS.darkGray,
+    textAlign: 'center',
   },
   activeTabText: {
     color: COLORS.white,

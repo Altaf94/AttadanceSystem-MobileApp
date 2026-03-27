@@ -359,11 +359,13 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   generateButtonText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   cancelButton: {
     flex: 1,
@@ -371,11 +373,13 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButtonText: {
     color: COLORS.textPrimary,
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   infoBox: {
     backgroundColor: '#e5f0ff',

@@ -121,6 +121,17 @@ export const updateUserPassword = async (
   });
 };
 
+export const updateUserService = async (
+  userId: string,
+  serviceUnit: string,
+  service: string
+): Promise<{ message: string }> => {
+  return apiCall(`/api/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ serviceUnit, service }),
+  });
+};
+
 export const deleteUser = async (userId: string): Promise<{ message: string }> => {
   return apiCall(`/api/users/${userId}`, {
     method: 'DELETE',

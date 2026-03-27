@@ -18,6 +18,7 @@ import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { loginUser } from '../services/api';
 import { saveUser } from '../utils';
+import { Icon } from '../components';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -78,10 +79,13 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={false}
         >
           <View style={styles.card}>
             {/* Logo Section */}
@@ -122,8 +126,16 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                   <TouchableOpacity
                     style={styles.eyeButton}
                     onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    activeOpacity={0.7}
+                    useNativeDriver={true}
                   >
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    <Icon
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={24}
+                      color={COLORS.gray}
+                      family="ionicons"
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -225,18 +237,19 @@ const styles = StyleSheet.create({
   },
   passwordContainer: {
     position: 'relative',
+    height: 50,
   },
   passwordInput: {
     paddingRight: 50,
+    height: 50,
   },
   eyeButton: {
     position: 'absolute',
-    right: 12,
-    top: 14,
-    padding: 4,
-  },
-  eyeIcon: {
-    fontSize: 18,
+    right: 15,
+    height: 50,
+    width: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     color: COLORS.danger,

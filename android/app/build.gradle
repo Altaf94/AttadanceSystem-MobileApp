@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -89,8 +90,8 @@ android {
         applicationId "com.attandance"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.0.2"
+        versionCode 4
+        versionName "1.0.3"
     }
     signingConfigs {
         debug {
@@ -119,6 +120,10 @@ android {
         }
     }
 }
+
+project.ext.vectoricons = [
+    project: [android: [sourceDir: '../node_modules/react-native-vector-icons/android']],
+]
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
