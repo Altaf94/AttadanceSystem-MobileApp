@@ -11,12 +11,13 @@ import {
   Alert,
   FlatList,
   Share,
+  Modal,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Picker } from '@react-native-picker/picker';
-import { RootStackParamList, ReportData, CheckIn } from '../types';
-import { COLORS } from '../constants';
-import { fetchReports } from '../services/api';
+import { RootStackParamList, ReportData, CheckIn, ServiceUnitItem } from '../types';
+import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
+import { fetchReports, submitCheckIn, deleteCheckIn, updateCheckIn, fetchServices } from '../services/api';
 import { getUser, isAdmin, formatDate } from '../utils';
 
 type ReportsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Reports'>;
@@ -24,6 +25,78 @@ type ReportsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList,
 interface Props {
   navigation: ReportsScreenNavigationProp;
 }
+
+// Custom Bar Chart Component
+interface BarChartItem {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+interface BarChartProps {
+  data: BarChartItem[];
+  title: string;
+  horizontal?: boolean;
+  maxBars?: number;
+  barColor?: string;
+}
+
+const BarChart: React.FC<BarChartProps> = ({ data, title, horizontal = false, maxBars = 10, barColor = COLORS.primary }) => {
+  const displayData = data.slice(0, maxBars);
+  const maxValue = Math.max(...displayData.map(d => d.value), 1);
+
+  if (horizontal) {
+    return (
+      <View style={chartStyles.chartContainer}>
+        <Text style={chartStyles.chartTitle}>{title}</Text>
+        {displayData.map((item, index) => (
+          <View key={index} style={chartStyles.horizontalBarRow}>
+            <Text style={chartStyles.horizontalBarLabel} numberOfLines={1}>{item.label}</Text>
+            <View style={chartStyles.horizontalBarContainer}>
+              <View
+                style={[
+                  chartStyles.horizontalBar,
+                  {
+                    width: `${(item.value / maxValue) * 100}%`,
+                    backgroundColor: item.color || barColor,
+                  },
+                ]}
+              />
+              <Text style={chartStyles.horizontalBarValue}>{item.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <View style={chartStyles.chartContainer}>
+      <Text style={chartStyles.chartTitle}>{title}</Text>
+      <View style={chartStyles.verticalChartWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={chartStyles.verticalBarsContainer}>
+            {displayData.map((item, index) => (
+              <View key={index} style={chartStyles.verticalBarWrapper}>
+                <Text style={chartStyles.verticalBarValue}>{item.value}</Text>
+                <View
+                  style={[
+                    chartStyles.verticalBar,
+                    {
+                      height: Math.max((item.value / maxValue) * 120, 20),
+                      backgroundColor: item.color || barColor,
+                    },
+                  ]}
+                />
+                <Text style={chartStyles.verticalBarLabel} numberOfLines={2}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </View>
+  );
+};
 
 const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   const [isUserAdmin, setIsUserAdmin] = useState<boolean | null>(null);
@@ -39,11 +112,39 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'volunteers' | 'events'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'volunteers' | 'events' | 'charts'>('overview');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  const [currentUserId, setCurrentUserId] = useState('');
+
+  // Add Attendance Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addVolId, setAddVolId] = useState('');
+  const [addVolName, setAddVolName] = useState('');
+  const [addEvent, setAddEvent] = useState('');
+  const [addService, setAddService] = useState('');
+  const [addServiceUnit, setAddServiceUnit] = useState('');
+  const [addDate, setAddDate] = useState<Date>(new Date());
+  const [showAddDatePicker, setShowAddDatePicker] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+
+  // Edit Check-in Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<CheckIn | null>(null);
+  const [editVolId, setEditVolId] = useState('');
+  const [editVolName, setEditVolName] = useState('');
+  const [editEvent, setEditEvent] = useState('');
+  const [editService, setEditService] = useState('');
+  const [editServiceUnit, setEditServiceUnit] = useState('');
+  const [editDate, setEditDate] = useState<Date>(new Date());
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Dynamic service units from API
+  const [serviceUnits, setServiceUnits] = useState<ServiceUnitItem[]>([]);
 
   const getGenderFromVolunteerId = (volunteerId: string): 'Male' | 'Female' | 'Unknown' => {
     if (!volunteerId) return 'Unknown';
@@ -58,11 +159,28 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
     checkAdminAccess();
   }, []);
 
+  // Load dynamic service units
+  useEffect(() => {
+    const loadServiceUnits = async () => {
+      try {
+        const data = await fetchServices();
+        if (data && Array.isArray(data)) {
+          setServiceUnits(data);
+        }
+      } catch (error) {
+        console.error('Failed to load service units:', error);
+        setServiceUnits([]);
+      }
+    };
+    loadServiceUnits();
+  }, []);
+
   const checkAdminAccess = async () => {
     try {
       const user = await getUser();
       const admin = isAdmin(user?.email);
       setIsUserAdmin(admin);
+      setCurrentUserId(user?.id || '');
       if (admin) {
         loadReports();
       }
@@ -89,6 +207,104 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
     }
   }, [startDate, endDate, selectedEvent, selectedService, searchQuery]);
+
+  const handleDeleteCheckIn = (checkIn: CheckIn) => {
+    Alert.alert(
+      'Delete Attendance',
+      `Delete attendance record for ${checkIn.volunteerName} (${checkIn.volunteerId})?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCheckIn(checkIn.id);
+              loadReports();
+            } catch (err) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete attendance');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openEditModal = (checkIn: CheckIn) => {
+    setEditTarget(checkIn);
+    setEditVolId(checkIn.volunteerId);
+    setEditVolName(checkIn.volunteerName);
+    setEditEvent(checkIn.event);
+    setEditService(checkIn.service || '');
+    setEditServiceUnit(checkIn.serviceUnit || '');
+    setEditDate(
+      checkIn.checkinAtClient
+        ? new Date(checkIn.checkinAtClient)
+        : new Date(checkIn.checkinAt)
+    );
+    setShowEditModal(true);
+  };
+
+  const handleEditCheckIn = async () => {
+    if (!editTarget) return;
+    if (!editVolId.trim() || !editVolName.trim() || !editEvent) {
+      Alert.alert('Validation', 'Volunteer ID, Name, and Event are required.');
+      return;
+    }
+    setEditLoading(true);
+    try {
+      await updateCheckIn(editTarget.id, {
+        volunteerId: editVolId.trim(),
+        volunteerName: editVolName.trim(),
+        event: editEvent,
+        service: editService.trim() || null,
+        serviceUnit: editServiceUnit.trim() || null,
+        checkinAt: editDate.toISOString(),
+        checkinAtClient: formatDate(editDate),
+      });
+      setShowEditModal(false);
+      setEditTarget(null);
+      loadReports();
+      Alert.alert('Success', 'Attendance updated successfully.');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update attendance');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleAddAttendance = async () => {
+    if (!addVolId.trim() || !addVolName.trim() || !addEvent) {
+      Alert.alert('Validation', 'Volunteer ID, Name, and Event are required.');
+      return;
+    }
+    setAddLoading(true);
+    try {
+      await submitCheckIn({
+        volunteerId: addVolId.trim(),
+        volunteerName: addVolName.trim(),
+        event: addEvent,
+        takenByUserId: currentUserId,
+        service: addService.trim() || undefined,
+        serviceUnit: addServiceUnit.trim() || undefined,
+        actionAt: addDate.toISOString(),
+        actionAtClient: formatDate(addDate),
+      });
+      setShowAddModal(false);
+      setAddVolId('');
+      setAddVolName('');
+      setAddEvent('');
+      setAddService('');
+      setAddServiceUnit('');
+      setAddDate(new Date());
+      loadReports();
+      Alert.alert('Success', 'Attendance added successfully.');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add attendance');
+    } finally {
+      setAddLoading(false);
+    }
+  };
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -177,6 +393,69 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
     return { male, female, unknown };
   }, [data]);
 
+  // Chart data computations
+  const serviceUnitStats = useMemo(() => {
+    if (!data) return [];
+    const unitCounts: Record<string, number> = {};
+    data.checkins.forEach((checkin) => {
+      const unit = checkin.serviceUnit || 'Other';
+      unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    return Object.entries(unitCounts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  const committeeStatsFemale = useMemo(() => {
+    if (!data) return [];
+    const committeeCounts: Record<string, number> = {};
+    data.checkins.forEach((checkin) => {
+      const gender = getGenderFromVolunteerId(checkin.volunteerId);
+      if (gender === 'Female') {
+        const service = checkin.service || 'Other';
+        committeeCounts[service] = (committeeCounts[service] || 0) + 1;
+      }
+    });
+    return Object.entries(committeeCounts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  const committeeStatsMale = useMemo(() => {
+    if (!data) return [];
+    const committeeCounts: Record<string, number> = {};
+    data.checkins.forEach((checkin) => {
+      const gender = getGenderFromVolunteerId(checkin.volunteerId);
+      if (gender === 'Male') {
+        const service = checkin.service || 'Other';
+        committeeCounts[service] = (committeeCounts[service] || 0) + 1;
+      }
+    });
+    return Object.entries(committeeCounts)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  const userWiseStats = useMemo(() => {
+    if (!data) return [];
+    const userCounts: Record<string, { name: string; count: number }> = {};
+    data.checkins.forEach((checkin) => {
+      const id = checkin.volunteerId;
+      if (!userCounts[id]) {
+        userCounts[id] = { name: checkin.volunteerName || id, count: 0 };
+      }
+      userCounts[id].count += 1;
+    });
+    return Object.values(userCounts)
+      .map(({ name, count }) => ({ label: name.split(' ')[0], value: count }))
+      .sort((a, b) => b.value - a.value);
+  }, [data]);
+
+  const genderChartData = useMemo(() => [
+    { label: 'Female', value: genderStats.female, color: '#FF6B6B' },
+    { label: 'Male', value: genderStats.male, color: '#4ECDC4' },
+  ], [genderStats]);
+
   if (isUserAdmin === null) {
     return (
       <View style={styles.loadingContainer}>
@@ -206,6 +485,20 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.checkInRow}>
         <Text style={styles.checkInId}>{item.volunteerId}</Text>
         <Text style={styles.checkInName}>{item.volunteerName}</Text>
+        <View style={styles.checkInActions}>
+          <TouchableOpacity
+            style={styles.editCheckInButton}
+            onPress={() => openEditModal(item)}
+          >
+            <Text style={styles.editCheckInButtonText}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteCheckInButton}
+            onPress={() => handleDeleteCheckIn(item)}
+          >
+            <Text style={styles.deleteCheckInButtonText}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.checkInRow}>
         <Text style={styles.checkInEvent}>{item.event}</Text>
@@ -371,6 +664,15 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
               Events
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'charts' && styles.activeTab]}
+            onPress={() => setActiveTab('charts')}
+          >
+            <Text style={styles.tabIcon}>📊</Text>
+            <Text style={[styles.tabText, activeTab === 'charts' && styles.activeTabText]}>
+              Charts
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {loading && (
@@ -467,9 +769,21 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
             {/* Check-ins Tab */}
             {activeTab === 'checkins' && (
               <View style={styles.checkinsContainer}>
-                <Text style={styles.checkinsTitle}>
-                  Total: {data.checkins.length} check-ins
-                </Text>
+                <View style={styles.checkinsHeader}>
+                  <Text style={styles.checkinsTitle}>
+                    Total: {data.checkins.length} check-ins
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.addAttendanceButton}
+                    onPress={() => {
+                      setAddEvent(selectedEvent || (data.filters.events[0] || ''));
+                      setAddDate(new Date());
+                      setShowAddModal(true);
+                    }}
+                  >
+                    <Text style={styles.addAttendanceButtonText}>+ Add</Text>
+                  </TouchableOpacity>
+                </View>
                 
                 <FlatList
                   data={paginatedCheckins}
@@ -562,9 +876,311 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </View>
             )}
+
+            {/* Charts Tab */}
+            {activeTab === 'charts' && (
+              <View style={styles.chartsContainer}>
+                {/* Summary Header */}
+                <View style={chartStyles.summaryHeader}>
+                  <Text style={chartStyles.summaryTitle}>
+                    {selectedEvent || 'All Events'} {startDate ? `- ${startDate}` : ''}
+                  </Text>
+                  <View style={chartStyles.summaryCards}>
+                    <View style={[chartStyles.summaryCard, chartStyles.summaryCardTotal]}>
+                      <Text style={chartStyles.summaryLabel}>Total Check Ins</Text>
+                      <Text style={[chartStyles.summaryValue, { color: '#1976D2' }]}>
+                        {data.summary.totalCheckins}
+                      </Text>
+                    </View>
+                    <View style={[chartStyles.summaryCard, chartStyles.summaryCardMale]}>
+                      <Text style={chartStyles.summaryLabel}>Male</Text>
+                      <Text style={[chartStyles.summaryValue, { color: '#1976D2' }]}>
+                        {genderStats.male}
+                      </Text>
+                    </View>
+                    <View style={[chartStyles.summaryCard, chartStyles.summaryCardFemale]}>
+                      <Text style={chartStyles.summaryLabel}>Female</Text>
+                      <Text style={[chartStyles.summaryValue, { color: '#D32F2F' }]}>
+                        {genderStats.female}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Service Unit Wise & Gender Wise Charts */}
+                <View style={chartStyles.chartsRow}>
+                  <View style={chartStyles.chartHalf}>
+                    <BarChart
+                      data={serviceUnitStats}
+                      title="Service Unit Wise"
+                      horizontal={false}
+                      maxBars={5}
+                      barColor="#4285F4"
+                    />
+                  </View>
+                  <View style={chartStyles.chartHalf}>
+                    <BarChart
+                      data={genderChartData}
+                      title="Gender Wise"
+                      horizontal={false}
+                      maxBars={2}
+                    />
+                  </View>
+                </View>
+
+                {/* Committee Wise Charts */}
+                <View style={chartStyles.chartsRow}>
+                  <View style={chartStyles.chartHalf}>
+                    <BarChart
+                      data={committeeStatsFemale}
+                      title="Committee Wise (Female)"
+                      horizontal={true}
+                      maxBars={10}
+                      barColor="#FF6B6B"
+                    />
+                  </View>
+                  <View style={chartStyles.chartHalf}>
+                    <BarChart
+                      data={committeeStatsMale}
+                      title="Committee Wise (Male)"
+                      horizontal={true}
+                      maxBars={10}
+                      barColor="#4ECDC4"
+                    />
+                  </View>
+                </View>
+
+                {/* User Wise Chart */}
+                <BarChart
+                  data={userWiseStats}
+                  title="User Wise"
+                  horizontal={false}
+                  maxBars={25}
+                  barColor="#FF9800"
+                />
+              </View>
+            )}
           </>
         )}
       </ScrollView>
+
+      {/* Add Attendance Modal */}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Attendance</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Volunteer ID*"
+                placeholderTextColor={COLORS.gray}
+                value={addVolId}
+                onChangeText={setAddVolId}
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Volunteer Name*"
+                placeholderTextColor={COLORS.gray}
+                value={addVolName}
+                onChangeText={setAddVolName}
+              />
+              <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
+                <Picker
+                  selectedValue={addEvent}
+                  onValueChange={setAddEvent}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Event*" value="" />
+                  {(data?.filters.events || []).map((e, idx) => (
+                    <Picker.Item key={`add-event-${idx}`} label={e} value={e} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
+                <Picker
+                  selectedValue={addServiceUnit}
+                  onValueChange={(val) => {
+                    setAddServiceUnit(val);
+                    setAddService('');
+                  }}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Service Unit (optional)" value="" />
+                  {/* Use dynamic service units from API, fallback to hardcoded constants */}
+                  {(serviceUnits.length > 0 ? serviceUnits.map(u => u.name) : SERVICE_UNIT_OPTIONS).map((unit, idx) => (
+                    <Picker.Item key={`add-unit-${idx}`} label={unit} value={unit} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={[styles.pickerContainer, { marginBottom: 12 }, !addServiceUnit && styles.pickerDisabled]}>
+                <Picker
+                  selectedValue={addService}
+                  onValueChange={setAddService}
+                  style={styles.picker}
+                  enabled={!!addServiceUnit}
+                >
+                  <Picker.Item label={addServiceUnit ? 'Select Service (optional)' : 'Select a Service Unit first'} value="" />
+                  {/* Use dynamic services from API, fallback to hardcoded constants */}
+                  {(() => {
+                    const dynamicUnit = serviceUnits.find(u => u.name === addServiceUnit);
+                    const services = dynamicUnit
+                      ? dynamicUnit.services.map(s => s.name)
+                      : (addServiceUnit ? (SERVICE_OPTIONS[addServiceUnit] || []) : []);
+                    return services.map((svc, idx) => (
+                      <Picker.Item key={`add-svc-${idx}`} label={svc} value={svc} />
+                    ));
+                  })()}
+                </Picker>
+              </View>
+              <TouchableOpacity
+                style={styles.modalInput}
+                onPress={() => setShowAddDatePicker(true)}
+              >
+                <Text style={{ color: COLORS.black }}>📅 {formatDate(addDate)}</Text>
+              </TouchableOpacity>
+              <DateTimePicker
+                visible={showAddDatePicker}
+                onClose={() => setShowAddDatePicker(false)}
+                onSelectDateTime={(date) => {
+                  setAddDate(date);
+                  setShowAddDatePicker(false);
+                }}
+              />
+              <TouchableOpacity
+                style={[styles.modalSubmitButton, addLoading && styles.exportButtonDisabled]}
+                onPress={handleAddAttendance}
+                disabled={addLoading}
+              >
+                {addLoading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.modalSubmitButtonText}>Add Attendance</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Attendance Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Attendance</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Volunteer ID*"
+                placeholderTextColor={COLORS.gray}
+                value={editVolId}
+                onChangeText={setEditVolId}
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Volunteer Name*"
+                placeholderTextColor={COLORS.gray}
+                value={editVolName}
+                onChangeText={setEditVolName}
+              />
+              <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
+                <Picker
+                  selectedValue={editEvent}
+                  onValueChange={setEditEvent}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Event*" value="" />
+                  {(data?.filters.events || []).map((e, idx) => (
+                    <Picker.Item key={`edit-event-${idx}`} label={e} value={e} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
+                <Picker
+                  selectedValue={editServiceUnit}
+                  onValueChange={(val) => {
+                    setEditServiceUnit(val);
+                    setEditService('');
+                  }}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Service Unit (optional)" value="" />
+                  {/* Use dynamic service units from API, fallback to hardcoded constants */}
+                  {(serviceUnits.length > 0 ? serviceUnits.map(u => u.name) : SERVICE_UNIT_OPTIONS).map((unit, idx) => (
+                    <Picker.Item key={`edit-unit-${idx}`} label={unit} value={unit} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={[styles.pickerContainer, { marginBottom: 12 }, !editServiceUnit && styles.pickerDisabled]}>
+                <Picker
+                  selectedValue={editService}
+                  onValueChange={setEditService}
+                  style={styles.picker}
+                  enabled={!!editServiceUnit}
+                >
+                  <Picker.Item label={editServiceUnit ? 'Select Service (optional)' : 'Select a Service Unit first'} value="" />
+                  {/* Use dynamic services from API, fallback to hardcoded constants */}
+                  {(() => {
+                    const dynamicUnit = serviceUnits.find(u => u.name === editServiceUnit);
+                    const services = dynamicUnit
+                      ? dynamicUnit.services.map(s => s.name)
+                      : (editServiceUnit ? (SERVICE_OPTIONS[editServiceUnit] || []) : []);
+                    return services.map((svc, idx) => (
+                      <Picker.Item key={`edit-svc-${idx}`} label={svc} value={svc} />
+                    ));
+                  })()}
+                </Picker>
+              </View>
+              <TouchableOpacity
+                style={styles.modalInput}
+                onPress={() => setShowEditDatePicker(true)}
+              >
+                <Text style={{ color: COLORS.black }}>📅 {formatDate(editDate)}</Text>
+              </TouchableOpacity>
+              <DateTimePicker
+                visible={showEditDatePicker}
+                onClose={() => setShowEditDatePicker(false)}
+                onSelectDateTime={(date) => {
+                  setEditDate(date);
+                  setShowEditDatePicker(false);
+                }}
+              />
+              <TouchableOpacity
+                style={[styles.modalSubmitButton, editLoading && styles.exportButtonDisabled]}
+                onPress={handleEditCheckIn}
+                disabled={editLoading}
+              >
+                {editLoading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.modalSubmitButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -711,6 +1327,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
     height: 50,
     justifyContent: 'center',
+  },
+  pickerDisabled: {
+    opacity: 0.5,
   },
   picker: {
     height: 50,
@@ -898,10 +1517,77 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  checkinsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   checkinsTitle: {
     fontSize: 14,
     color: COLORS.gray,
+  },
+  addAttendanceButton: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addAttendanceButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalClose: {
+    fontSize: 20,
+    color: COLORS.gray,
+    padding: 4,
+  },
+  modalInput: {
+    backgroundColor: COLORS.white,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    color: COLORS.black,
+    fontSize: 14,
     marginBottom: 12,
+  },
+  modalSubmitButton: {
+    backgroundColor: COLORS.primary,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  modalSubmitButtonText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 16,
   },
   volunteersContainer: {
     backgroundColor: COLORS.white,
@@ -952,6 +1638,30 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     marginTop: 4,
   },
+  checkInGender: {
+    fontSize: 11,
+    color: COLORS.primary,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  checkInActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editCheckInButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  editCheckInButtonText: {
+    fontSize: 16,
+  },
+  deleteCheckInButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  deleteCheckInButtonText: {
+    fontSize: 16,
+  },
   emptyText: {
     textAlign: 'center',
     color: COLORS.gray,
@@ -981,6 +1691,163 @@ const styles = StyleSheet.create({
   pageInfo: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  chartsContainer: {
+    gap: 16,
+  },
+});
+
+// Chart-specific styles
+const chartStyles = StyleSheet.create({
+  summaryHeader: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: COLORS.textPrimary,
+    padding: 8,
+    borderRadius: 4,
+  },
+  summaryCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  summaryCard: {
+    flex: 1,
+    borderWidth: 2,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  summaryCardTotal: {
+    borderColor: COLORS.textPrimary,
+  },
+  summaryCardMale: {
+    borderColor: COLORS.textPrimary,
+  },
+  summaryCardFemale: {
+    borderColor: COLORS.textPrimary,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  chartsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  chartHalf: {
+    flex: 1,
+  },
+  chartContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 8,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1976D2',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  // Horizontal bar styles
+  horizontalBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  horizontalBarLabel: {
+    width: 100,
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    paddingRight: 8,
+  },
+  horizontalBarContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  horizontalBar: {
+    height: '100%',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 4,
+  },
+  horizontalBarValue: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginLeft: 4,
+  },
+  // Vertical bar styles
+  verticalChartWrapper: {
+    alignItems: 'center',
+  },
+  verticalBarsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    minHeight: 150,
+  },
+  verticalBarWrapper: {
+    alignItems: 'center',
+    marginHorizontal: 4,
+    minWidth: 40,
+  },
+  verticalBarValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 4,
+    backgroundColor: '#1976D2',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  verticalBar: {
+    width: 36,
+    borderRadius: 4,
+    minHeight: 20,
+  },
+  verticalBarLabel: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    marginTop: 6,
+    textAlign: 'center',
+    maxWidth: 50,
   },
 });
 

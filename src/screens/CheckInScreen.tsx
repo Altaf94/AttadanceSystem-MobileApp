@@ -33,13 +33,16 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   const [event, setEvent] = useState(route.params?.event || '');
   const [customDateTime, setCustomDateTime] = useState<Date | null>(null);
   const [takenByUserId, setTakenByUserId] = useState('');
-  const [service, setService] = useState<string | null>(null);
-  const [serviceUnit, setServiceUnit] = useState<string | null>(null);
+  const [service, setService] = useState<string | null>(route.params?.service || null);
+  const [serviceUnit, setServiceUnit] = useState<string | null>(route.params?.serviceUnit || null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isAutoSubmitting, setIsAutoSubmitting] = useState(false);
+
+  // Check if service/serviceUnit came from route params (special user)
+  const hasRouteService = !!route.params?.service;
 
   useEffect(() => {
     loadUserData().then(() => {
@@ -71,8 +74,11 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
       setTakenByUserId(user.id);
-      setService(user.service || null);
-      setServiceUnit(user.serviceUnit || null);
+      // Only set service/serviceUnit from user if not provided via route params (special user)
+      if (!hasRouteService) {
+        setService(user.service || null);
+        setServiceUnit(user.serviceUnit || null);
+      }
     } catch (err) {
       navigation.reset({
         index: 0,

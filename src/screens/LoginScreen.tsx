@@ -128,7 +128,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                     onPress={() => setShowPassword(!showPassword)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
-                    useNativeDriver={true}
                   >
                     <Icon
                       name={showPassword ? 'eye-off' : 'eye'}

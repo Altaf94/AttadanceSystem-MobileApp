@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../constants';
-import { User, EventItem, ReportData, UserListItem } from '../types';
+import { User, EventItem, ReportData, UserListItem, ServiceUnitItem } from '../types';
 
 // Helper function for API calls
 const apiCall = async <T>(
@@ -136,4 +136,33 @@ export const deleteUser = async (userId: string): Promise<{ message: string }> =
   return apiCall(`/api/users/${userId}`, {
     method: 'DELETE',
   });
+};
+
+export const deleteCheckIn = async (id: string): Promise<{ message: string }> => {
+  return apiCall(`/api/checkin/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+export const updateCheckIn = async (
+  id: string,
+  data: {
+    volunteerId?: string;
+    volunteerName?: string;
+    event?: string;
+    service?: string | null;
+    serviceUnit?: string | null;
+    checkinAt?: string;
+    checkinAtClient?: string | null;
+  }
+): Promise<{ ok: boolean; checkIn?: any }> => {
+  return apiCall(`/api/checkin/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+// Services APIs (dynamic service units and services from database)
+export const fetchServices = async (): Promise<ServiceUnitItem[]> => {
+  return apiCall('/api/services');
 };

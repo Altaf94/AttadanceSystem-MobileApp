@@ -72,11 +72,26 @@ export interface UserListItem {
   createdAt: string;
 }
 
+// Service Unit Types (dynamic from API)
+export interface ServiceItem {
+  id: string;
+  name: string;
+  serviceUnitId: string;
+}
+
+export interface ServiceUnitItem {
+  id: string;
+  name: string;
+  services: ServiceItem[];
+}
+
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   CheckIn: { 
     event?: string;
+    service?: string;
+    serviceUnit?: string;
     scannedData?: {
       volunteerId: string;
       volunteerName: string;
@@ -88,7 +103,7 @@ export type RootStackParamList = {
   AddEvent: undefined;
   ManageEvents: undefined;
   GenerateQR: undefined;
-  QRScanner: { event: string };
+  QRScanner: { event: string; service?: string; serviceUnit?: string };
   UserManagement: undefined;
   BackdatedAttendance: undefined;
 };

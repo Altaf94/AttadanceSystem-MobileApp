@@ -37,6 +37,10 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
   const scannedRef = useRef(false);
   const device = useCameraDevice('back');
 
+  // Get service/serviceUnit from route params (for special users) or user data
+  const routeService = route.params?.service;
+  const routeServiceUnit = route.params?.serviceUnit;
+
   useEffect(() => {
     checkCameraPermission();
     loadUserData();
@@ -114,13 +118,17 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
       const actionDate = new Date();
       const localTimeFormatted = getPakistanTime(actionDate);
 
+      // Use route params (for special users) or fall back to user's default service/serviceUnit
+      const serviceToUse = routeService || userService || undefined;
+      const serviceUnitToUse = routeServiceUnit || userServiceUnit || undefined;
+
       const response = await submitCheckIn({
         volunteerId,
         volunteerName: volunteerName || '',
         event,
         takenByUserId: userId,
-        service: userService || undefined,
-        serviceUnit: userServiceUnit || undefined,
+        service: serviceToUse,
+        serviceUnit: serviceUnitToUse,
         actionAt: actionDate.toISOString(),
         actionAtClient: localTimeFormatted,
       });

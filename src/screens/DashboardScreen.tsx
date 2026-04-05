@@ -14,7 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import { checkForUpdate, UpdateFlow } from 'react-native-in-app-updates';
-import { RootStackParamList, User, LastAttendance } from '../types';
+import { RootStackParamList, User, LastAttendance, ServiceUnitItem } from '../types';
 import {
   COLORS,
   SERVICE_UNIT_OPTIONS,
@@ -22,7 +22,7 @@ import {
   DAY_TYPE_OPTIONS,
   SPECIAL_USER_EMAILS,
 } from '../constants';
-import { fetchEvents, submitCheckIn } from '../services/api';
+import { fetchEvents, submitCheckIn, fetchServices } from '../services/api';
 import { getUser, removeUser, isAdmin, isSpecialUser, parseQrPayload, getPakistanTime } from '../utils';
 
 type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
@@ -43,6 +43,10 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [lastAttendance, setLastAttendance] = useState<LastAttendance | null>(null);
   const [hasCheckedUpdate, setHasCheckedUpdate] = useState(false);
+  
+  // Dynamic service units from API
+  const [serviceUnits, setServiceUnits] = useState<ServiceUnitItem[]>([]);
+  const [serviceUnitsLoading, setServiceUnitsLoading] = useState(false);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -85,6 +89,23 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, []);
 
+  // Load dynamic service units from API
+  const loadServiceUnits = useCallback(async () => {
+    setServiceUnitsLoading(true);
+    try {
+      const data = await fetchServices();
+      if (data && Array.isArray(data)) {
+        setServiceUnits(data);
+      }
+    } catch (error) {
+      console.error('Failed to load service units:', error);
+      // Fall back to empty - will use hardcoded constants as backup
+      setServiceUnits([]);
+    } finally {
+      setServiceUnitsLoading(false);
+    }
+  }, []);
+
   const checkInAppUpdate = useCallback(() => {
     if (Platform.OS !== 'android' || hasCheckedUpdate) {
       return;
@@ -99,8 +120,9 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     useCallback(() => {
       loadUserData();
       loadOccasions();
+      loadServiceUnits();
       checkInAppUpdate();
-    }, [loadUserData, loadOccasions, checkInAppUpdate])
+    }, [loadUserData, loadOccasions, loadServiceUnits, checkInAppUpdate])
   );
 
   const handleLogout = async () => {
@@ -127,11 +149,29 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
     
     // Navigate to QR Scanner screen with the selected occasion
-    navigation.navigate('QRScanner', { event: selectedOccasion });
+    // For special users, also pass the selected service/serviceUnit
+    if (isUserSpecial && selectedServiceUnit && selectedService) {
+      navigation.navigate('QRScanner', {
+        event: selectedOccasion,
+        service: selectedService,
+        serviceUnit: selectedServiceUnit,
+      });
+    } else {
+      navigation.navigate('QRScanner', { event: selectedOccasion });
+    }
   };
 
   const handleManualCheckIn = () => {
-    navigation.navigate('CheckIn', { event: selectedOccasion || undefined });
+    // For special users, also pass the selected service/serviceUnit
+    if (isUserSpecial && selectedServiceUnit && selectedService) {
+      navigation.navigate('CheckIn', {
+        event: selectedOccasion || undefined,
+        service: selectedService,
+        serviceUnit: selectedServiceUnit,
+      });
+    } else {
+      navigation.navigate('CheckIn', { event: selectedOccasion || undefined });
+    }
   };
 
   if (loading) {
@@ -288,30 +328,35 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
             {/* Service Unit Selection */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Select Service Unit</Text>
-              <View style={styles.optionsContainer}>
-                {SERVICE_UNIT_OPTIONS.map(unit => (
-                  <TouchableOpacity
-                    key={unit}
-                    style={[
-                      styles.optionButton,
-                      selectedServiceUnit === unit && styles.optionButtonSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedServiceUnit(unit);
-                      setSelectedService('');
-                    }}
-                  >
-                    <Text
+              {serviceUnitsLoading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <View style={styles.optionsContainer}>
+                  {/* Use dynamic service units from API, fallback to hardcoded constants */}
+                  {(serviceUnits.length > 0 ? serviceUnits.map(u => u.name) : SERVICE_UNIT_OPTIONS).map(unit => (
+                    <TouchableOpacity
+                      key={unit}
                       style={[
-                        styles.optionButtonText,
-                        selectedServiceUnit === unit && styles.optionButtonTextSelected,
+                        styles.optionButton,
+                        selectedServiceUnit === unit && styles.optionButtonSelected,
                       ]}
+                      onPress={() => {
+                        setSelectedServiceUnit(unit);
+                        setSelectedService('');
+                      }}
                     >
-                      {unit}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          selectedServiceUnit === unit && styles.optionButtonTextSelected,
+                        ]}
+                      >
+                        {unit}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Service Selection */}
@@ -319,25 +364,32 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Select Service</Text>
                 <View style={styles.optionsContainer}>
-                  {SERVICE_OPTIONS[selectedServiceUnit]?.map(service => (
-                    <TouchableOpacity
-                      key={service}
-                      style={[
-                        styles.optionButton,
-                        selectedService === service && styles.optionButtonSelectedGreen,
-                      ]}
-                      onPress={() => setSelectedService(service)}
-                    >
-                      <Text
+                  {/* Use dynamic services from API, fallback to hardcoded constants */}
+                  {(() => {
+                    const dynamicUnit = serviceUnits.find(u => u.name === selectedServiceUnit);
+                    const services = dynamicUnit
+                      ? dynamicUnit.services.map(s => s.name)
+                      : (SERVICE_OPTIONS[selectedServiceUnit] || []);
+                    return services.map(service => (
+                      <TouchableOpacity
+                        key={service}
                         style={[
-                          styles.optionButtonText,
-                          selectedService === service && styles.optionButtonTextSelected,
+                          styles.optionButton,
+                          selectedService === service && styles.optionButtonSelectedGreen,
                         ]}
+                        onPress={() => setSelectedService(service)}
                       >
-                        {service}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.optionButtonText,
+                            selectedService === service && styles.optionButtonTextSelected,
+                          ]}
+                        >
+                          {service}
+                        </Text>
+                      </TouchableOpacity>
+                    ));
+                  })()}
                 </View>
               </View>
             )}
