@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,9 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
-import { checkForUpdate, UpdateFlow } from 'react-native-in-app-updates';
 import { RootStackParamList, User, LastAttendance, ServiceUnitItem } from '../types';
 import {
   COLORS,
@@ -45,7 +43,6 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedService, setSelectedService] = useState('');
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [lastAttendance, setLastAttendance] = useState<LastAttendance | null>(null);
-  const [hasCheckedUpdate, setHasCheckedUpdate] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   
@@ -111,24 +108,18 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, []);
 
-  const checkInAppUpdate = useCallback(() => {
-    if (Platform.OS !== 'android' || hasCheckedUpdate) {
-      return;
-    }
-    setHasCheckedUpdate(true);
-    checkForUpdate(UpdateFlow.FLEXIBLE).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.log('In-app update check failed:', message);
-    });
-  }, [hasCheckedUpdate]);
+  const dashboardDataLoadedRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
       loadUserData();
+      if (dashboardDataLoadedRef.current) {
+        return;
+      }
+      dashboardDataLoadedRef.current = true;
       loadOccasions();
       loadServiceUnits();
-      checkInAppUpdate();
-    }, [loadUserData, loadOccasions, loadServiceUnits, checkInAppUpdate])
+    }, [loadUserData, loadOccasions, loadServiceUnits])
   );
 
   const handleLogout = () => {

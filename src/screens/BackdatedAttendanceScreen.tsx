@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
+import { QR_SCAN_COOLDOWN_MS } from '../constants/scanCooldown';
 import { fetchEvents, submitCheckIn } from '../services/api';
 import { getUser, isAdmin, parseQrPayload } from '../utils';
 import DateTimePicker from '../components/DateTimePicker';
@@ -32,8 +33,6 @@ interface LastAttendance {
   volunteerName: string;
   time: string;
 }
-
-const SCAN_COOLDOWN_MS = 2500;
 
 const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
   const [isUserAdmin, setIsUserAdmin] = useState<boolean | null>(null);
@@ -58,6 +57,8 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
   const [torchOn, setTorchOn] = useState(false);
 
   const scannedRef = useRef(false);
+  const canScanRef = useRef(true);
+  const cooldownActiveRef = useRef(false);
   const showScannerRef = useRef(false);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const device = useCameraDevice('back');
@@ -129,6 +130,7 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
       );
       return;
     }
+    canScanRef.current = true;
     scannedRef.current = false;
     setProcessingQR(false);
     setTorchOn(false);
@@ -141,6 +143,8 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
       clearTimeout(cooldownTimerRef.current);
       cooldownTimerRef.current = null;
     }
+    canScanRef.current = false;
+    cooldownActiveRef.current = false;
     setShowScanner(false);
     setIsActive(false);
     scannedRef.current = false;
@@ -149,10 +153,16 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
     setTorchOn(false);
   };
 
-  const beginScanCooldown = () => {
-    setIsActive(false);
+  const lockScanner = () => {
+    canScanRef.current = false;
     scannedRef.current = true;
+    setIsActive(false);
+  };
+
+  const beginScanCooldown = () => {
+    lockScanner();
     setProcessingQR(false);
+    cooldownActiveRef.current = true;
     setCooldownActive(true);
 
     if (cooldownTimerRef.current) {
@@ -160,30 +170,34 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     cooldownTimerRef.current = setTimeout(() => {
+      cooldownActiveRef.current = false;
       setCooldownActive(false);
       scannedRef.current = false;
       cooldownTimerRef.current = null;
       if (showScannerRef.current) {
+        canScanRef.current = true;
         setIsActive(true);
       }
-    }, SCAN_COOLDOWN_MS);
+    }, QR_SCAN_COOLDOWN_MS);
   };
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (processingQR || scannedRef.current || !isActive || cooldownActive) {
+      if (!canScanRef.current || scannedRef.current) {
         return;
       }
 
       if (codes.length > 0 && codes[0].value) {
-        scannedRef.current = true;
+        lockScanner();
         setProcessingQR(true);
-        setIsActive(false);
         processQRCode(codes[0].value);
       }
     },
   });
+
+  const cameraScanningEnabled =
+    showScanner && isActive && !cooldownActive && !processingQR;
 
   const buildActionTimestamps = (date: Date) => {
     const year = date.getFullYear();
@@ -436,7 +450,7 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
               device={device}
               isActive={isActive}
               torch={torchOn ? 'on' : 'off'}
-              codeScanner={codeScanner}
+              codeScanner={cameraScanningEnabled ? codeScanner : undefined}
             />
           ) : (
             <View style={styles.scannerLoadingContainer}>
@@ -496,7 +510,7 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.processingContainer}>
                 <ActivityIndicator size="large" color="#fff" />
                 <Text style={styles.processingText}>
-                  Camera paused — ready to scan again in a moment…
+                  Camera paused for {QR_SCAN_COOLDOWN_MS / 1000}s — preventing duplicate scans…
                 </Text>
               </View>
             )}

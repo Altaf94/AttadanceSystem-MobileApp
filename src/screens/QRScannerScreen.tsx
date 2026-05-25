@@ -13,6 +13,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types';
 import {parseQrPayload, getUser, getPakistanTime} from '../utils';
 import {submitCheckIn} from '../services/api';
+import {QR_SCAN_COOLDOWN_MS} from '../constants/scanCooldown';
 
 type QRScannerScreenProps = NativeStackScreenProps<RootStackParamList, 'QRScanner'>;
 
@@ -25,8 +26,6 @@ interface CheckInResult {
   errorMessage?: string;
 }
 
-const SCAN_COOLDOWN_MS = 2500;
-
 const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) => {
   const [processingQR, setProcessingQR] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
@@ -38,7 +37,8 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
   const [userService, setUserService] = useState<string | null>(null);
   const [userServiceUnit, setUserServiceUnit] = useState<string | null>(null);
   const scannedRef = useRef(false);
-  const cooldownDoneRef = useRef(true);
+  const canScanRef = useRef(true);
+  const cooldownActiveRef = useRef(false);
   const checkInResultRef = useRef<CheckInResult | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const device = useCameraDevice('back');
@@ -96,47 +96,56 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
     }
   };
 
+  const lockScanner = () => {
+    canScanRef.current = false;
+    scannedRef.current = true;
+    setIsActive(false);
+  };
+
   const tryResumeScanning = () => {
-    if (cooldownDoneRef.current && checkInResultRef.current === null) {
-      scannedRef.current = false;
-      setIsActive(true);
+    if (checkInResultRef.current !== null || cooldownActiveRef.current) {
+      return;
     }
+    canScanRef.current = true;
+    scannedRef.current = false;
+    setIsActive(true);
   };
 
   const beginScanCooldown = () => {
-    setIsActive(false);
-    scannedRef.current = true;
+    lockScanner();
     setProcessingQR(false);
+    cooldownActiveRef.current = true;
     setCooldownActive(true);
-    cooldownDoneRef.current = false;
 
     if (cooldownTimerRef.current) {
       clearTimeout(cooldownTimerRef.current);
     }
 
     cooldownTimerRef.current = setTimeout(() => {
-      cooldownDoneRef.current = true;
+      cooldownActiveRef.current = false;
       setCooldownActive(false);
       cooldownTimerRef.current = null;
       tryResumeScanning();
-    }, SCAN_COOLDOWN_MS);
+    }, QR_SCAN_COOLDOWN_MS);
   };
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (processingQR || scannedRef.current || !isActive || cooldownActive) {
+      if (!canScanRef.current || scannedRef.current) {
         return;
       }
 
       if (codes.length > 0 && codes[0].value) {
-        scannedRef.current = true;
+        lockScanner();
         setProcessingQR(true);
-        setIsActive(false);
         processQRCode(codes[0].value);
       }
     },
   });
+
+  const cameraScanningEnabled =
+    isActive && !cooldownActive && !processingQR && checkInResult === null;
 
   const processQRCode = async (qrData: string) => {
     try {
@@ -204,6 +213,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
   };
 
   const handleDismissResult = () => {
+    checkInResultRef.current = null;
     setCheckInResult(null);
     tryResumeScanning();
   };
@@ -212,6 +222,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
     if (cooldownActive) {
       return;
     }
+    canScanRef.current = true;
     scannedRef.current = false;
     setProcessingQR(false);
     setIsActive(true);
@@ -246,7 +257,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
         device={device}
         isActive={isActive}
         torch={torchOn ? 'on' : 'off'}
-        codeScanner={codeScanner}
+        codeScanner={cameraScanningEnabled ? codeScanner : undefined}
       />
 
       <View style={styles.overlay}>
@@ -292,7 +303,7 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
             <View style={styles.processingContainer}>
               <ActivityIndicator size="large" color="#ffffff" />
               <Text style={styles.processingText}>
-                Camera paused — ready to scan again in a moment…
+                Camera paused for {QR_SCAN_COOLDOWN_MS / 1000}s — preventing duplicate scans…
               </Text>
             </View>
           )}
