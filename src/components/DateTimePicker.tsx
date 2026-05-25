@@ -247,14 +247,23 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const handleConfirm = () => {
     const finalDate = new Date(selectedDate);
+
+    if (dateOnly) {
+      // Noon local avoids UTC date shifting when callers format the calendar day
+      finalDate.setHours(12, 0, 0, 0);
+      onSelectDateTime(finalDate);
+      onClose();
+      return;
+    }
+
     let hour = hours;
-    
+
     if (ampm === 'PM' && hours !== 12) {
       hour += 12;
     } else if (ampm === 'AM' && hours === 12) {
       hour = 0;
     }
-    
+
     finalDate.setHours(hour, minutes, 0, 0);
     onSelectDateTime(finalDate);
     onClose();

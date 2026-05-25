@@ -15,7 +15,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { getUser, isAdmin } from '../utils';
-import { QRCodeDisplay } from '../components';
+import {
+  QRCodeDisplay,
+  ScreenLayout,
+  FormField,
+  PrimaryButton,
+  Icon,
+} from '../components';
+import { screenStyles } from '../theme/screenStyles';
 import { generateVolunteerQRPayload } from '../utils/qrcode';
 import { useEffect } from 'react';
 
@@ -76,106 +83,78 @@ const GenerateQRScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Checking access...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Checking access..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access denied</Text>
-        <Text style={styles.accessDeniedText}>Only admins can generate QR codes.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="qr-code-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>Only admins can generate QR codes.</Text>
+            <PrimaryButton title="Go Back" onPress={() => navigation.goBack()} variant="secondary" />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Generate QR Code</Text>
-            <Text style={styles.subtitle}>Create QR codes for volunteers to scan during check-in</Text>
+    <ScreenLayout keyboard>
+          <View style={screenStyles.card}>
+            <Text style={screenStyles.screenTitle}>Generate QR Code</Text>
+            <Text style={screenStyles.screenSubtitle}>
+              Create QR codes for volunteers to scan during check-in
+            </Text>
 
-            <View style={styles.form}>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Volunteer ID *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., VOL001"
-                  placeholderTextColor={COLORS.gray}
-                  value={volunteerId}
-                  onChangeText={setVolunteerId}
-                  autoCapitalize="none"
-                />
+            <FormField
+              label="Volunteer ID"
+              icon="id-card-outline"
+              placeholder="e.g., VOL001"
+              value={volunteerId}
+              onChangeText={setVolunteerId}
+              autoCapitalize="none"
+            />
+
+            <FormField
+              label="Volunteer name"
+              icon="person-outline"
+              placeholder="e.g., John Doe"
+              value={volunteerName}
+              onChangeText={setVolunteerName}
+            />
+
+            <FormField
+              label="CNIC (optional)"
+              icon="card-outline"
+              placeholder="e.g., 12345-1234567-1"
+              value={cnic}
+              onChangeText={setCnic}
+            />
+
+            {error ? (
+              <View style={screenStyles.errorBanner}>
+                <Icon name="alert-circle-outline" size={18} color={COLORS.danger} family="ionicons" />
+                <Text style={[screenStyles.bannerText, screenStyles.errorText]}>{error}</Text>
               </View>
+            ) : null}
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Volunteer Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., John Doe"
-                  placeholderTextColor={COLORS.gray}
-                  value={volunteerName}
-                  onChangeText={setVolunteerName}
-                />
+            <View style={styles.buttonRow}>
+              <View style={styles.flexBtn}>
+                <PrimaryButton title="Generate QR" icon="qr-code-outline" onPress={handleGenerateQR} />
               </View>
+              <PrimaryButton title="Back" onPress={() => navigation.goBack()} variant="secondary" style={styles.backBtn} />
+            </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>CNIC (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., 12345-1234567-1"
-                  placeholderTextColor={COLORS.gray}
-                  value={cnic}
-                  onChangeText={setCnic}
-                />
-              </View>
-
-              {error && <Text style={styles.errorText}>{error}</Text>}
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.generateButton}
-                  onPress={handleGenerateQR}
-                >
-                  <Text style={styles.generateButtonText}>Generate QR Code</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.cancelButtonText}>Back</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Info Box */}
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>💡 How it works:</Text>
-                <Text style={styles.infoText}>
-                  1. Enter volunteer details above{'\n'}
-                  2. Click "Generate QR Code"{'\n'}
-                  3. A QR code will appear containing: Volunteer ID | Name | CNIC{'\n'}
-                  4. Volunteers can scan this during check-in
-                </Text>
-              </View>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>How it works</Text>
+              <Text style={styles.infoText}>
+                Enter volunteer details, generate a QR code, and print it for check-in scanning.
+              </Text>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
 
       {/* QR Code Modal */}
       <Modal
@@ -184,8 +163,8 @@ const GenerateQRScreen: React.FC<Props> = ({ navigation }) => {
         animationType="slide"
         onRequestClose={() => setShowQRModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+        <View style={screenStyles.modalOverlay}>
+          <View style={[styles.modalContent, screenStyles.modalCard, { width: '100%', maxWidth: 400 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>QR Code Generated</Text>
               <TouchableOpacity
@@ -246,14 +225,18 @@ const GenerateQRScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+  flexBtn: { flex: 1 },
+  backBtn: { minWidth: 100 },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 4,
   },
   keyboardView: {
     flex: 1,
@@ -348,11 +331,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
   generateButton: {
     flex: 1,
     backgroundColor: COLORS.primary,
@@ -382,9 +360,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   infoBox: {
+    marginTop: 24,
+    marginBottom: 4,
     backgroundColor: '#e5f0ff',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
   },

@@ -1,21 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { createEvent } from '../services/api';
-import { DateTimePicker, Icon } from '../components';
+import {
+  DateTimePicker,
+  Icon,
+  ScreenLayout,
+  FormField,
+  PrimaryButton,
+} from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type AddEventScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddEvent'>;
 
@@ -68,10 +70,7 @@ const AddEventScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await createEvent(title.trim());
       Alert.alert('Success', 'Occasion added successfully', [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Dashboard'),
-        },
+        { text: 'OK', onPress: () => navigation.navigate('Dashboard') },
       ]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add occasion';
@@ -82,245 +81,135 @@ const AddEventScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // Passcode verification screen
   if (!isPasscodeVerified) {
     return (
-      <View style={styles.container}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
-          <View style={styles.card}>
-            <Text style={styles.title}>Verify Passcode</Text>
-            <Text style={styles.subtitle}>Enter the passcode to create a new occasion.</Text>
+      <ScreenLayout keyboard centered>
+        <View style={[screenStyles.card, styles.card]}>
+          <Text style={screenStyles.screenTitle}>Verify Passcode</Text>
+          <Text style={screenStyles.screenSubtitle}>
+            Enter the passcode to create a new occasion.
+          </Text>
 
-            <View style={styles.form}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter passcode"
-                placeholderTextColor={COLORS.gray}
-                value={passcode}
-                onChangeText={setPasscode}
-                secureTextEntry
-                keyboardType="number-pad"
-              />
+          <FormField
+            label="Passcode"
+            icon="key-outline"
+            placeholder="Enter passcode"
+            value={passcode}
+            onChangeText={setPasscode}
+            secureTextEntry
+            keyboardType="number-pad"
+          />
 
-              {passcodeError && <Text style={styles.errorText}>{passcodeError}</Text>}
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.verifyButton}
-                  onPress={handlePasscodeSubmit}
-                >
-                  <Text style={styles.verifyButtonText}>Verify</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
+          {passcodeError ? (
+            <View style={screenStyles.errorBanner}>
+              <Icon name="alert-circle-outline" size={18} color={COLORS.danger} family="ionicons" />
+              <Text style={[screenStyles.bannerText, screenStyles.errorText]}>{passcodeError}</Text>
             </View>
+          ) : null}
+
+          <View style={styles.buttonRow}>
+            <View style={styles.flexBtn}>
+              <PrimaryButton title="Verify" icon="shield-checkmark-outline" onPress={handlePasscodeSubmit} />
+            </View>
+            <PrimaryButton title="Cancel" onPress={() => navigation.goBack()} variant="secondary" style={styles.cancelBtn} />
           </View>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
-  // Add occasion form
   return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardView}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.card}>
-            <Text style={styles.title}>Add Occasion</Text>
-            <Text style={styles.subtitle}>
-              Create a new occasion to use when checking in volunteers.
-            </Text>
+    <ScreenLayout keyboard centered>
+      <View style={[screenStyles.card, styles.card]}>
+        <Text style={screenStyles.screenTitle}>Add Occasion</Text>
+        <Text style={screenStyles.screenSubtitle}>
+          Create a new occasion to use when checking in volunteers.
+        </Text>
 
-            <View style={styles.form}>
-              <TextInput
-                style={styles.input}
-                placeholder="Occasion title"
-                placeholderTextColor={COLORS.gray}
-                value={title}
-                onChangeText={setTitle}
-              />
+        <FormField
+          label="Occasion title"
+          icon="calendar-outline"
+          placeholder="Occasion name"
+          value={title}
+          onChangeText={setTitle}
+        />
 
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Icon name="event" size={22} color={COLORS.gray} family="material" />
-                <Text style={eventDate ? styles.datePickerText : styles.datePickerPlaceholder}>
-                  {eventDate ? formatDateTime(eventDate) : 'Select Date & Time'}
-                </Text>
-              </TouchableOpacity>
+        <Text style={screenStyles.label}>Date & time (optional)</Text>
+        <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
+          <Icon name="time-outline" size={20} color={COLORS.gray} family="ionicons" />
+          <Text style={eventDate ? styles.dateText : styles.datePlaceholder}>
+            {eventDate ? formatDateTime(eventDate) : 'Select date & time'}
+          </Text>
+        </TouchableOpacity>
 
-              <DateTimePicker
-                visible={showDatePicker}
-                onClose={() => setShowDatePicker(false)}
-                onSelectDateTime={(date) => {
-                  setEventDate(date);
-                }}
-                initialDate={eventDate || undefined}
-              />
+        <DateTimePicker
+          visible={showDatePicker}
+          onClose={() => setShowDatePicker(false)}
+          onSelectDateTime={setEventDate}
+          initialDate={eventDate || undefined}
+        />
 
-              {error && <Text style={styles.errorText}>{error}</Text>}
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                  onPress={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={COLORS.white} size="small" />
-                  ) : (
-                    <Text style={styles.submitButtonText}>Add Occasion</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        {error ? (
+          <View style={screenStyles.errorBanner}>
+            <Icon name="alert-circle-outline" size={18} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.bannerText, screenStyles.errorText]}>{error}</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        ) : null}
+
+        <View style={styles.buttonRow}>
+          <View style={styles.flexBtn}>
+            <PrimaryButton
+              title="Add Occasion"
+              icon="add-circle-outline"
+              onPress={handleSubmit}
+              loading={loading}
+            />
+          </View>
+          <PrimaryButton title="Cancel" onPress={() => navigation.goBack()} variant="secondary" style={styles.cancelBtn} />
+        </View>
+      </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f6fb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  keyboardView: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   card: {
     width: '100%',
     maxWidth: 500,
-    padding: 28,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    alignSelf: 'center',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  form: {
-    gap: 12,
-  },
-  input: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    color: COLORS.black,
-    fontSize: 16,
-  },
-  datePickerButton: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+  dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: '#f5f8fa',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(11, 90, 121, 0.1)',
   },
-  datePickerText: {
-    color: COLORS.black,
-    fontSize: 16,
+  dateText: {
     flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
   },
-  datePickerPlaceholder: {
+  datePlaceholder: {
+    flex: 1,
+    fontSize: 16,
     color: COLORS.gray,
-    fontSize: 16,
-    flex: 1,
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 14,
   },
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
-  verifyButton: {
+  flexBtn: {
     flex: 1,
-    backgroundColor: '#8e44ad',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  verifyButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: '#8e44ad',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    padding: 14,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: COLORS.black,
-    fontSize: 16,
-    fontWeight: '500',
+  cancelBtn: {
+    minWidth: 100,
   },
 });
 

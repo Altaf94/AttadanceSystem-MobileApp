@@ -18,7 +18,9 @@ import { Picker } from '@react-native-picker/picker';
 import { RootStackParamList, ReportData, CheckIn, ServiceUnitItem } from '../types';
 import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
 import { fetchReports, submitCheckIn, deleteCheckIn, updateCheckIn, fetchServices } from '../services/api';
-import { getUser, isAdmin, formatDate } from '../utils';
+import { getUser, isAdmin, formatDate, formatLocalDateKey } from '../utils';
+import { ScreenLayout, PrimaryButton, Icon } from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type ReportsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Reports'>;
 
@@ -457,26 +459,23 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   ], [genderStats]);
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Checking access...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Checking access..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access denied</Text>
-        <Text style={styles.accessDeniedText}>You do not have permission to view reports.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="bar-chart-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>
+              You do not have permission to view reports.
+            </Text>
+            <PrimaryButton title="Go Back" onPress={() => navigation.goBack()} variant="secondary" />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
@@ -514,13 +513,13 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <ScreenLayout scroll={false}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
+        <View style={[screenStyles.card, styles.headerCard]}>
+          <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Attendance Reports</Text>
-            <Text style={styles.headerSubtitle}>Detailed analytics and insights</Text>
+            <Text style={screenStyles.screenTitle}>Attendance Reports</Text>
+            <Text style={screenStyles.screenSubtitle}>Detailed analytics and insights</Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
@@ -538,9 +537,9 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+        </View>
 
-        {/* Filters */}
-        <View style={styles.filtersCard}>
+        <View style={[screenStyles.card, styles.filtersCard]}>
           <Text style={styles.filtersTitle}>Filters & Search</Text>
           <View style={styles.filtersGrid}>
             <View style={styles.filterRow}>
@@ -566,8 +565,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
               visible={showStartDatePicker}
               onClose={() => setShowStartDatePicker(false)}
               onSelectDateTime={(date) => {
-                const formatted = date.toISOString().split('T')[0];
-                setStartDate(formatted);
+                setStartDate(formatLocalDateKey(date));
               }}
               dateOnly
             />
@@ -575,8 +573,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
               visible={showEndDatePicker}
               onClose={() => setShowEndDatePicker(false)}
               onSelectDateTime={(date) => {
-                const formatted = date.toISOString().split('T')[0];
-                setEndDate(formatted);
+                setEndDate(formatLocalDateKey(date));
               }}
               dateOnly
             />
@@ -678,7 +675,7 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
         {loading && (
           <View style={styles.loadingSection}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading reports...</Text>
+            <Text style={screenStyles.loadingText}>Loading reports...</Text>
           </View>
         )}
 
@@ -1181,54 +1178,17 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
   scrollContent: {
     padding: 16,
-    paddingTop: 40,
+    paddingBottom: 32,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: COLORS.gray,
-    fontSize: 16,
-  },
-  accessDenied: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: COLORS.background,
-  },
-  accessDeniedTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.danger,
-    marginBottom: 8,
-  },
-  accessDeniedText: {
-    fontSize: 16,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+  headerCard: {
+    marginBottom: 16,
   },
   backButtonText: {
     color: COLORS.white,
@@ -1265,8 +1225,8 @@ const styles = StyleSheet.create({
   exportButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    backgroundColor: '#0b5a79',
   },
   exportButtonDisabled: {
     backgroundColor: COLORS.lightGray,
@@ -1277,15 +1237,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   filtersCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   filtersTitle: {
     fontSize: 16,

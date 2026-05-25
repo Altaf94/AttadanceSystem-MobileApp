@@ -6,10 +6,11 @@
  */
 
 import React from 'react';
-import { StatusBar, useColorScheme, LogBox } from 'react-native';
+import { StatusBar, LogBox, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation';
 import { ToastProvider } from './src/components';
+import { BRAND_TEAL } from './src/theme/brand';
 
 // Suppress known warnings
 LogBox.ignoreLogs([
@@ -17,20 +18,27 @@ LogBox.ignoreLogs([
 ]);
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
   return (
-    <SafeAreaProvider>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
-      />
-      <ToastProvider>
-        <AppNavigator />
-      </ToastProvider>
-    </SafeAreaProvider>
+    <View style={styles.root}>
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={BRAND_TEAL}
+          translucent={false}
+        />
+        <ToastProvider>
+          <AppNavigator />
+        </ToastProvider>
+      </SafeAreaProvider>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BRAND_TEAL,
+  },
+});
 
 export default App;

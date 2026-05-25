@@ -1,12 +1,45 @@
 import { API_BASE_URL } from '../constants';
 import { User, EventItem, ReportData, UserListItem, ServiceUnitItem } from '../types';
 
+const logApi = (label: string, data: Record<string, unknown>) => {
+  if (__DEV__) {
+    console.log(`[API] ${label}`, data);
+  }
+};
+
+const redactBodyForLog = (body: RequestInit['body']): unknown => {
+  if (typeof body !== 'string') {
+    return body ?? null;
+  }
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    if (typeof parsed.password === 'string') {
+      return {
+        ...parsed,
+        password: `[${parsed.password.length} chars]`,
+      };
+    }
+    return parsed;
+  } catch {
+    return body;
+  }
+};
+
 // Helper function for API calls
 const apiCall = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const method = options.method ?? 'GET';
+
+  logApi('request', {
+    method,
+    url,
+    body: redactBodyForLog(options.body),
+  });
+
+  const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -16,17 +49,27 @@ const apiCall = async <T>(
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(payload.message || 'Request failed');
+    logApi('error response', {
+      method,
+      url,
+      status: response.status,
+      payload,
+    });
+    throw new Error(
+      typeof payload.message === 'string' ? payload.message : 'Request failed'
+    );
   }
 
-  return response.json();
+  const data = await response.json();
+  logApi('success', { method, url, status: response.status });
+  return data as T;
 };
 
 // Auth APIs
 export const loginUser = async (email: string, password: string): Promise<{ user: User }> => {
   return apiCall('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password: password.trim() }),
   });
 };
 
@@ -39,7 +82,7 @@ export const registerUser = async (data: {
 }): Promise<{ message: string }> => {
   return apiCall('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, name: data.name.trim(), email: data.email.trim().toLowerCase(), password: data.password.trim() }),
   });
 };
 

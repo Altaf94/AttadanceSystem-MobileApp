@@ -16,7 +16,8 @@ import { RootStackParamList, UserListItem } from '../types';
 import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
 import { fetchUsers, updateUserPassword, deleteUser, updateUserService } from '../services/api';
 import { getUser, isAdmin } from '../utils';
-import { Icon } from '../components';
+import { ScreenLayout, ScreenHeader, PrimaryButton, Icon } from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type UserManagementScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'UserManagement'>;
 
@@ -158,45 +159,32 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
   const inactiveUsers = users.filter(u => !u.active).length;
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Loading..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access Denied</Text>
-        <Text style={styles.accessDeniedText}>Only admins can manage users.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Text style={styles.backButtonText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="people-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>Only admins can manage users.</Text>
+            <PrimaryButton title="Back to Dashboard" onPress={() => navigation.navigate('Dashboard')} />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>User Management</Text>
-              <Text style={styles.headerSubtitle}>View and manage all users</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.headerBackButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.headerBackButtonText}>Back</Text>
-            </TouchableOpacity>
-          </View>
+    <ScreenLayout>
+        <View style={screenStyles.card}>
+          <ScreenHeader
+            title="User Management"
+            subtitle="View and manage all users"
+            onBack={() => navigation.goBack()}
+          />
 
           {/* Stats Section */}
           <View style={styles.statsContainer}>
@@ -215,14 +203,12 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {/* Action Buttons */}
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.registerButton}
-              onPress={() => navigation.navigate('RegisterUser')}
-            >
-              <Text style={styles.registerButtonText}>+ Register User</Text>
-            </TouchableOpacity>
-          </View>
+          <PrimaryButton
+            title="Register User"
+            icon="person-add-outline"
+            onPress={() => navigation.navigate('RegisterUser')}
+            style={{ marginBottom: 16 }}
+          />
 
           {loading ? (
             <View style={styles.loadingSection}>
@@ -240,7 +226,7 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
                 const isCurrentUser = user.id === loggedInUserId;
 
                 return (
-                  <View key={user.id} style={styles.userItem}>
+                  <View key={user.id} style={[styles.userItem, screenStyles.cardCompact]}>
                     <View style={styles.userInfo}>
                       <Text style={styles.userName}>{user.name || 'No name'}</Text>
                       <Text style={styles.userEmail}>{user.email}</Text>
@@ -313,7 +299,6 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
         </View>
-      </ScrollView>
 
       {/* Password Change Modal */}
       <Modal
@@ -476,25 +461,11 @@ const UserManagementScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
   loadingText: {
     marginTop: 10,
     color: COLORS.gray,

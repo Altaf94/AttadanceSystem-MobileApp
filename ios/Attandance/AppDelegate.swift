@@ -29,6 +29,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       launchOptions: launchOptions
     )
 
+    window?.backgroundColor = UIColor(
+      red: 0.0431372549,
+      green: 0.3529411765,
+      blue: 0.4745098039,
+      alpha: 1
+    )
+
     return true
   }
 }

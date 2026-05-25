@@ -6,6 +6,10 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && npm run lint",
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "build:android:debug": "cd android && ./gradlew assembleDebug",
     "start": "react-native start",
     "test": "jest"
   },

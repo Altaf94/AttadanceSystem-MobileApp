@@ -2,24 +2,25 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  ActivityIndicator,
   Image,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Picker } from '@react-native-picker/picker';
-import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../types';
 import { COLORS, SERVICE_UNIT_OPTIONS, SERVICE_OPTIONS } from '../constants';
 import { registerUser } from '../services/api';
 import { getUser, isAdmin } from '../utils';
-import { Icon } from '../components';
+import {
+  ScreenLayout,
+  FormField,
+  PasswordField,
+  PrimaryButton,
+  Icon,
+} from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type RegisterUserScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'RegisterUser'>;
 
@@ -45,8 +46,7 @@ const RegisterUserScreen: React.FC<Props> = ({ navigation }) => {
   const checkAdminAccess = async () => {
     try {
       const user = await getUser();
-      const admin = isAdmin(user?.email);
-      setIsUserAdmin(admin);
+      setIsUserAdmin(isAdmin(user?.email));
     } catch {
       setIsUserAdmin(false);
     }
@@ -67,8 +67,14 @@ const RegisterUserScreen: React.FC<Props> = ({ navigation }) => {
     setMessage(null);
 
     try {
-      await registerUser({ name, email, password, service, serviceUnit });
-      setMessage('✓ User registered successfully');
+      await registerUser({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        service,
+        serviceUnit,
+      });
+      setMessage('User registered successfully');
       setName('');
       setEmail('');
       setPassword('');
@@ -85,383 +91,155 @@ const RegisterUserScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Checking access...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Checking access..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access denied</Text>
-        <Text style={styles.accessDeniedText}>You do not have permission to register users.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="shield-off-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>
+              You do not have permission to register users.
+            </Text>
+            <PrimaryButton title="Go Back" onPress={() => navigation.goBack()} variant="secondary" />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
+  const isSuccess = message?.includes('successfully');
+
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardView}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.card}>
-            {/* Logo Section */}
-            <View style={styles.logoSection}>
-              <Image
-                source={require('../assets/images/LoginLogo.jpg')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
+    <ScreenLayout keyboard centered>
+      <View style={screenStyles.card}>
+        <View style={screenStyles.logoWrap}>
+          <Image
+            source={require('../assets/images/LoginLogo.jpg')}
+            style={screenStyles.logo}
+            resizeMode="contain"
+          />
+        </View>
 
-            {/* Form Section */}
-            <View style={styles.formSection}>
-              <Text style={styles.title}>Register User</Text>
-              <Text style={styles.subtitle}>Add a new volunteer to the system</Text>
+        <Text style={screenStyles.screenTitle}>Register User</Text>
+        <Text style={screenStyles.screenSubtitle}>Add a new volunteer to the system</Text>
 
-              <View style={styles.form}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Full name"
-                  placeholderTextColor={COLORS.gray}
-                  value={name}
-                  onChangeText={setName}
-                />
+        <FormField
+          label="Full name"
+          icon="person-outline"
+          placeholder="Volunteer name"
+          value={name}
+          onChangeText={setName}
+        />
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email address"
-                  placeholderTextColor={COLORS.gray}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
+        <FormField
+          label="Email"
+          icon="mail-outline"
+          placeholder="you@example.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
 
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    placeholder="Password"
-                    placeholderTextColor={COLORS.gray}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Icon 
-                      name={showPassword ? 'visibility' : 'visibility-off'} 
-                      size={22} 
-                      color={COLORS.gray} 
-                      family="material" 
-                    />
-                  </TouchableOpacity>
-                </View>
+        <PasswordField
+          label="Password"
+          placeholder="At least 6 characters"
+          value={password}
+          onChangeText={setPassword}
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword(!showPassword)}
+        />
 
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={serviceUnit}
-                    onValueChange={(value) => {
-                      setServiceUnit(value);
-                      setService('');
-                    }}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Select Service Unit" value="" />
-                    {SERVICE_UNIT_OPTIONS.map(unit => (
-                      <Picker.Item key={unit} label={unit} value={unit} />
-                    ))}
-                  </Picker>
-                </View>
+        <Text style={screenStyles.label}>Service unit</Text>
+        <View style={screenStyles.pickerWrap}>
+          <Picker
+            selectedValue={serviceUnit}
+            onValueChange={(value) => {
+              setServiceUnit(value);
+              setService('');
+            }}
+            style={screenStyles.picker}
+          >
+            <Picker.Item label="Select service unit" value="" />
+            {SERVICE_UNIT_OPTIONS.map(unit => (
+              <Picker.Item key={unit} label={unit} value={unit} />
+            ))}
+          </Picker>
+        </View>
 
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={service}
-                    onValueChange={setService}
-                    style={styles.picker}
-                    enabled={!!serviceUnit}
-                  >
-                    <Picker.Item label="Select Service" value="" />
-                    {serviceUnit && SERVICE_OPTIONS[serviceUnit]?.map(s => (
-                      <Picker.Item key={s} label={s} value={s} />
-                    ))}
-                  </Picker>
-                </View>
+        <Text style={screenStyles.label}>Service</Text>
+        <View style={screenStyles.pickerWrap}>
+          <Picker
+            selectedValue={service}
+            onValueChange={setService}
+            style={screenStyles.picker}
+            enabled={!!serviceUnit}
+          >
+            <Picker.Item label="Select service" value="" />
+            {serviceUnit &&
+              SERVICE_OPTIONS[serviceUnit]?.map(s => (
+                <Picker.Item key={s} label={s} value={s} />
+              ))}
+          </Picker>
+        </View>
 
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.submitButton,
-                      (loading || !serviceUnit || !service || password.length < 6) && styles.submitButtonDisabled,
-                    ]}
-                    onPress={handleSubmit}
-                    disabled={loading || !serviceUnit || !service || password.length < 6}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color={COLORS.white} size="small" />
-                    ) : (
-                      <Text style={styles.submitButtonText}>✓ Register</Text>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => navigation.goBack()}
-                  >
-                    <Text style={styles.cancelButtonText}>Back</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {message && (
-                  <View
-                    style={[
-                      styles.messageContainer,
-                      message.includes('successfully') ? styles.successMessage : styles.errorMessage,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        message.includes('successfully') ? styles.successText : styles.errorText,
-                      ]}
-                    >
-                      {message}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+        {message ? (
+          <View style={isSuccess ? screenStyles.successBanner : screenStyles.errorBanner}>
+            <Icon
+              name={isSuccess ? 'checkmark-circle-outline' : 'alert-circle-outline'}
+              size={18}
+              color={isSuccess ? COLORS.success : COLORS.danger}
+              family="ionicons"
+            />
+            <Text
+              style={[
+                screenStyles.bannerText,
+                isSuccess ? screenStyles.successText : screenStyles.errorText,
+              ]}
+            >
+              {message}
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+        ) : null}
+
+        <View style={styles.buttonRow}>
+          <View style={styles.primaryBtn}>
+            <PrimaryButton
+              title="Register"
+              icon="person-add-outline"
+              onPress={handleSubmit}
+              loading={loading}
+              disabled={!serviceUnit || !service || password.length < 6}
+            />
+          </View>
+          <PrimaryButton
+            title="Back"
+            onPress={() => navigation.goBack()}
+            variant="secondary"
+            style={styles.backBtn}
+          />
+        </View>
+      </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: COLORS.gray,
-  },
-  accessDenied: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: COLORS.background,
-  },
-  accessDeniedTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.danger,
-    marginBottom: 8,
-  },
-  accessDeniedText: {
-    fontSize: 16,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  logoSection: {
-    backgroundColor: COLORS.cardBackground,
-    padding: 30,
-    alignItems: 'center',
-  },
-  logo: {
-    width: 150,
-    height: 100,
-  },
-  formSection: {
-    padding: 30,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 20,
-  },
-  form: {
-    gap: 14,
-  },
-  input: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    color: COLORS.black,
-    fontSize: 14,
-    height: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  passwordContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-    height: 50,
-  },
-  passwordInput: {
-    paddingRight: 50,
-    height: 50,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 40,
-  },
-  eyeIcon: {
-    fontSize: 18,
-  },
-  pickerContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  picker: {
-    height: 50,
-    color: COLORS.black,
-  },
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 4,
+    marginTop: 8,
+    alignItems: 'stretch',
   },
-  submitButton: {
+  primaryBtn: {
     flex: 1,
-    backgroundColor: COLORS.primary,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9ec9ff',
-    shadowOpacity: 0,
-  },
-  submitButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#ecf0f1',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  cancelButtonText: {
-    color: COLORS.darkGray,
-    fontWeight: '600',
-  },
-  messageContainer: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  successMessage: {
-    backgroundColor: '#eaf7ee',
-    borderWidth: 1,
-    borderColor: '#b7dfc1',
-  },
-  errorMessage: {
-    backgroundColor: '#ffe6e6',
-    borderWidth: 1,
-    borderColor: '#f8b4b4',
-  },
-  messageText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  successText: {
-    color: '#146c43',
-  },
-  errorText: {
-    color: '#c24242',
+  backBtn: {
+    minWidth: 100,
   },
 });
 

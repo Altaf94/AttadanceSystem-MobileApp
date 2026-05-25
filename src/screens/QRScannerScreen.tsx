@@ -25,17 +25,35 @@ interface CheckInResult {
   errorMessage?: string;
 }
 
+const SCAN_COOLDOWN_MS = 2500;
+
 const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) => {
   const [processingQR, setProcessingQR] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
   const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
+  const [cooldownActive, setCooldownActive] = useState(false);
   const [userId, setUserId] = useState<string>('');
   const [userService, setUserService] = useState<string | null>(null);
   const [userServiceUnit, setUserServiceUnit] = useState<string | null>(null);
   const scannedRef = useRef(false);
+  const cooldownDoneRef = useRef(true);
+  const checkInResultRef = useRef<CheckInResult | null>(null);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const device = useCameraDevice('back');
+
+  useEffect(() => {
+    checkInResultRef.current = checkInResult;
+  }, [checkInResult]);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current);
+      }
+    };
+  }, []);
 
   // Get service/serviceUnit from route params (for special users) or user data
   const routeService = route.params?.service;
@@ -78,10 +96,36 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
     }
   };
 
+  const tryResumeScanning = () => {
+    if (cooldownDoneRef.current && checkInResultRef.current === null) {
+      scannedRef.current = false;
+      setIsActive(true);
+    }
+  };
+
+  const beginScanCooldown = () => {
+    setIsActive(false);
+    scannedRef.current = true;
+    setProcessingQR(false);
+    setCooldownActive(true);
+    cooldownDoneRef.current = false;
+
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+    }
+
+    cooldownTimerRef.current = setTimeout(() => {
+      cooldownDoneRef.current = true;
+      setCooldownActive(false);
+      cooldownTimerRef.current = null;
+      tryResumeScanning();
+    }, SCAN_COOLDOWN_MS);
+  };
+
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (processingQR || scannedRef.current || !isActive) {
+      if (processingQR || scannedRef.current || !isActive || cooldownActive) {
         return;
       }
 
@@ -144,7 +188,6 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
         action,
         time: currentTime,
       });
-      setProcessingQR(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Check-in failed';
       setCheckInResult({
@@ -155,19 +198,20 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
         time: '',
         errorMessage,
       });
-      setProcessingQR(false);
+    } finally {
+      beginScanCooldown();
     }
   };
 
   const handleDismissResult = () => {
-    // Reset everything to continue scanning
     setCheckInResult(null);
-    scannedRef.current = false;
-    setProcessingQR(false);
-    setIsActive(true);
+    tryResumeScanning();
   };
 
   const handleRetry = () => {
+    if (cooldownActive) {
+      return;
+    }
     scannedRef.current = false;
     setProcessingQR(false);
     setIsActive(true);
@@ -244,7 +288,16 @@ const QRScannerScreen: React.FC<QRScannerScreenProps> = ({navigation, route}) =>
             </View>
           )}
 
-          {!isActive && !processingQR && !checkInResult && (
+          {cooldownActive && !processingQR && (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="large" color="#ffffff" />
+              <Text style={styles.processingText}>
+                Camera paused — ready to scan again in a moment…
+              </Text>
+            </View>
+          )}
+
+          {!isActive && !processingQR && !checkInResult && !cooldownActive && (
             <TouchableOpacity
               style={styles.retryButton}
               onPress={handleRetry}

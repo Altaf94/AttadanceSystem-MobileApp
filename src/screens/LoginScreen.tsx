@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { loginUser } from '../services/api';
 import { saveUser } from '../utils';
-import { Icon } from '../components';
+import {
+  ScreenLayout,
+  FormField,
+  PasswordField,
+  PrimaryButton,
+  Icon,
+  AppAlertModal,
+} from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+
+interface LoginError {
+  message: string;
+  showModal: boolean;
+}
 
 interface Props {
   navigation: LoginScreenNavigationProp;
@@ -31,11 +31,15 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError | null>(null);
+
+  const clearError = () => {
+    if (error) setError(null);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Please enter email and password');
+      setError({ message: 'Please enter email and password', showModal: false });
       return;
     }
 
@@ -43,7 +47,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setError(null);
 
     try {
-      const response = await loginUser(email, password);
+      const response = await loginUser(email.trim().toLowerCase(), password.trim());
       const user = response?.user;
 
       if (user?.id) {
@@ -64,215 +68,88 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed';
-      setError(message);
-      Alert.alert('Login Failed', message);
+      setError({ message, showModal: true });
     } finally {
       setLoading(false);
     }
   };
 
+  const inlineError = error && !error.showModal ? error.message : null;
+
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          scrollEnabled={false}
-        >
-          <View style={styles.card}>
-            {/* Logo Section */}
-            <View style={styles.logoSection}>
-              <Image
-                source={require('../assets/images/LoginLogo.jpg')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
+    <ScreenLayout keyboard centered>
+      <View style={screenStyles.card}>
+        <View style={screenStyles.logoWrap}>
+          <Image
+            source={require('../assets/images/LoginLogo.jpg')}
+            style={screenStyles.logo}
+            resizeMode="contain"
+          />
+        </View>
 
-            {/* Login Form Section */}
-            <View style={styles.formSection}>
-              <Text style={styles.welcomeText}>Welcome Back</Text>
+        <Text style={[screenStyles.screenTitle, loginStyles.headerTitle]}>
+          Attendance System
+        </Text>
 
-              <View style={styles.form}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor={COLORS.gray}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+        <FormField
+          label="Email"
+          icon="mail-outline"
+          placeholder="you@example.com"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            clearError();
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    placeholder="Password"
-                    placeholderTextColor={COLORS.gray}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    activeOpacity={0.7}
-                  >
-                    <Icon
-                      name={showPassword ? 'eye-off' : 'eye'}
-                      size={24}
-                      color={COLORS.gray}
-                      family="ionicons"
-                    />
-                  </TouchableOpacity>
-                </View>
+        <PasswordField
+          label="Password"
+          placeholder="Enter your password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            clearError();
+          }}
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword(!showPassword)}
+        />
 
-                {error && <Text style={styles.errorText}>{error}</Text>}
-
-                <TouchableOpacity
-                  style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-                  onPress={handleLogin}
-                  disabled={loading}
-                >
-                  <LinearGradient
-                    colors={['#1e90ff', '#00bfff']}
-                    style={styles.loginButtonGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.loginButtonText}>Log In</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
+        {inlineError ? (
+          <View style={screenStyles.errorBanner}>
+            <Icon name="alert-circle-outline" size={18} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.bannerText, screenStyles.errorText]}>{inlineError}</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+        ) : null}
+
+        <PrimaryButton
+          title="Sign In"
+          icon="log-in-outline"
+          onPress={handleLogin}
+          loading={loading}
+        />
+      </View>
+
+      <AppAlertModal
+        visible={!!error?.showModal}
+        title="Login failed"
+        message={error?.showModal ? error.message : ''}
+        variant="error"
+        confirmText="Try again"
+        onClose={() => setError(null)}
+      />
+    </ScreenLayout>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  logoSection: {
-    backgroundColor: COLORS.white,
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  logo: {
-    width: 150,
-    height: 150,
-  },
-  divider: {
-    height: 6,
-    backgroundColor: '#0b5a79',
-  },
-  formSection: {
-    padding: 30,
-    borderTopWidth: 6,
-    borderTopColor: '#0b5a79',
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.black,
+const loginStyles = StyleSheet.create({
+  headerTitle: {
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  form: {
-    width: '100%',
-    maxWidth: 300,
     alignSelf: 'center',
-  },
-  input: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    color: COLORS.black,
-    fontSize: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  passwordContainer: {
-    position: 'relative',
-    height: 50,
-  },
-  passwordInput: {
-    paddingRight: 50,
-    height: 50,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 15,
-    height: 50,
-    width: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  loginButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  loginButtonDisabled: {
-    opacity: 0.7,
-  },
-  loginButtonGradient: {
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+    width: '100%',
+    marginBottom: 28,
   },
 });
 

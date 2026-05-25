@@ -2,14 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -17,7 +12,14 @@ import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { submitCheckIn } from '../services/api';
 import { getUser, getPakistanTime } from '../utils';
-import DateTimePicker from '../components/DateTimePicker';
+import {
+  DateTimePicker,
+  ScreenLayout,
+  FormField,
+  PrimaryButton,
+  Icon,
+} from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type CheckInScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CheckIn'>;
 type CheckInScreenRouteProp = RouteProp<RootStackParamList, 'CheckIn'>;
@@ -41,12 +43,10 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isAutoSubmitting, setIsAutoSubmitting] = useState(false);
 
-  // Check if service/serviceUnit came from route params (special user)
   const hasRouteService = !!route.params?.service;
 
   useEffect(() => {
     loadUserData().then(() => {
-      // Auto-submit if scanned data is provided
       if (route.params?.scannedData) {
         const { volunteerId: scannedId, volunteerName: scannedName } = route.params.scannedData;
         setVolunteerId(scannedId);
@@ -57,7 +57,6 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [route.params?.scannedData]);
 
   useEffect(() => {
-    // Auto-submit when user data is loaded and we have scanned data
     if (isAutoSubmitting && takenByUserId && volunteerId && event) {
       autoSubmitCheckIn();
     }
@@ -67,33 +66,24 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       const user = await getUser();
       if (!user) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        });
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
         return;
       }
       setTakenByUserId(user.id);
-      // Only set service/serviceUnit from user if not provided via route params (special user)
       if (!hasRouteService) {
         setService(user.service || null);
         setServiceUnit(user.serviceUnit || null);
       }
-    } catch (err) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+    } catch {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     }
   };
 
   const autoSubmitCheckIn = async () => {
     setLoading(true);
     setError(null);
-
     const actionDate = new Date();
     const localTimeFormatted = getPakistanTime(actionDate);
-
     try {
       const response = await submitCheckIn({
         volunteerId,
@@ -105,17 +95,14 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
         actionAt: actionDate.toISOString(),
         actionAtClient: localTimeFormatted,
       });
-
       const action = response?.action === 'checked_out' ? 'Checked out' : 'Checked in';
-      const currentTime = getPakistanTime(actionDate);
-
-      setMessage(`${action} at ${currentTime}`);
+      setMessage(`${action} at ${localTimeFormatted}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unexpected error';
       setError(errorMessage);
       Alert.alert('Error', errorMessage);
+    } finally {
       setLoading(false);
-      // Allow user to close and rescan
       setIsAutoSubmitting(false);
     }
   };
@@ -146,10 +133,8 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       });
 
       const action = response?.action === 'checked_out' ? 'Checked out' : 'Checked in';
-      const currentTime = getPakistanTime(actionDate);
-
-      setMessage(`${action} at ${currentTime}`);
-      Alert.alert('Success', `Attendance marked successfully (${action} at ${currentTime})`);
+      setMessage(`${action} at ${localTimeFormatted}`);
+      Alert.alert('Success', `Attendance marked successfully (${action} at ${localTimeFormatted})`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unexpected error';
       setError(errorMessage);
@@ -168,118 +153,96 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     setIsAutoSubmitting(false);
   };
 
-  // Success state
   if (message) {
     return (
-      <View style={styles.container}>
-        <View style={styles.successCard}>
+      <ScreenLayout centered>
+        <View style={[screenStyles.card, styles.centerCard]}>
+          <Icon name="checkmark-circle" size={56} color={COLORS.success} family="ionicons" />
           <Text style={styles.successName}>{volunteerName}</Text>
           <Text style={styles.successId}>{volunteerId}</Text>
           <Text style={styles.successMessage}>{message}</Text>
-          <TouchableOpacity style={styles.newCheckInButton} onPress={handleNewCheckIn}>
-            <Text style={styles.newCheckInButtonText}>New Check-in</Text>
-          </TouchableOpacity>
+          <PrimaryButton title="New Check-in" onPress={handleNewCheckIn} icon="add-circle-outline" />
         </View>
-      </View>
+      </ScreenLayout>
     );
   }
 
-  // Loading state when auto-submitting
   if (isAutoSubmitting && loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingCard}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Processing Check-in...</Text>
-        </View>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Processing check-in..." />;
   }
 
   return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Volunteer Check-in</Text>
-            <Text style={styles.subtitle}>
-              Enter volunteer details + event to check-in (or check-out if already checked in).
-            </Text>
+    <ScreenLayout keyboard centered>
+      <View style={[screenStyles.card, styles.formCard]}>
+        <Text style={screenStyles.screenTitle}>Volunteer Check-in</Text>
+        <Text style={screenStyles.screenSubtitle}>
+          Enter volunteer details and event to check in or check out.
+        </Text>
 
-            <View style={styles.form}>
-              <TextInput
-                style={styles.input}
-                placeholder="Volunteer ID"
-                placeholderTextColor={COLORS.gray}
-                value={volunteerId}
-                onChangeText={setVolunteerId}
-                autoCapitalize="none"
-              />
+        <FormField
+          label="Volunteer ID"
+          icon="id-card-outline"
+          placeholder="Volunteer ID"
+          value={volunteerId}
+          onChangeText={setVolunteerId}
+          autoCapitalize="none"
+        />
 
-              <TextInput
-                style={styles.input}
-                placeholder="Volunteer Name"
-                placeholderTextColor={COLORS.gray}
-                value={volunteerName}
-                onChangeText={setVolunteerName}
-              />
+        <FormField
+          label="Volunteer name"
+          icon="person-outline"
+          placeholder="Full name"
+          value={volunteerName}
+          onChangeText={setVolunteerName}
+        />
 
-              <TextInput
-                style={styles.input}
-                placeholder="Event"
-                placeholderTextColor={COLORS.gray}
-                value={event}
-                onChangeText={setEvent}
-              />
+        <FormField
+          label="Event / occasion"
+          icon="calendar-outline"
+          placeholder="Event name"
+          value={event}
+          onChangeText={setEvent}
+        />
 
-              <View>
-                <Text style={styles.label}>Date & Time (Optional)</Text>
-                <TouchableOpacity
-                  style={styles.datePickerButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.datePickerButtonText}>
-                    {customDateTime
-                      ? customDateTime.toLocaleString('en-GB', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : 'Tap to select date & time (leave empty for automatic)'}
-                  </Text>
-                </TouchableOpacity>
-                {customDateTime && (
-                  <TouchableOpacity
-                    onPress={() => setCustomDateTime(null)}
-                    style={styles.clearDateButton}
-                  >
-                    <Text style={styles.clearDateButtonText}>Clear</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+        <Text style={screenStyles.label}>Date & time (optional)</Text>
+        <TouchableOpacity
+          style={styles.datePickerButton}
+          onPress={() => setShowDatePicker(true)}
+          activeOpacity={0.8}
+        >
+          <Icon name="time-outline" size={20} color={COLORS.gray} family="ionicons" />
+          <Text style={styles.datePickerButtonText}>
+            {customDateTime
+              ? customDateTime.toLocaleString('en-GB', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Tap to select (leave empty for now)'}
+          </Text>
+        </TouchableOpacity>
+        {customDateTime ? (
+          <TouchableOpacity onPress={() => setCustomDateTime(null)} style={styles.clearDate}>
+            <Text style={styles.clearDateText}>Clear date & time</Text>
+          </TouchableOpacity>
+        ) : null}
 
-              {error && <Text style={styles.errorText}>{error}</Text>}
-
-              <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.submitButtonText}>Submit</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+        {error ? (
+          <View style={screenStyles.errorBanner}>
+            <Icon name="alert-circle-outline" size={18} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.bannerText, screenStyles.errorText]}>{error}</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        ) : null}
+
+        <PrimaryButton
+          title="Submit"
+          icon="checkmark-circle-outline"
+          onPress={handleSubmit}
+          loading={loading}
+        />
+      </View>
 
       <DateTimePicker
         visible={showDatePicker}
@@ -287,172 +250,68 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
         onSelectDateTime={setCustomDateTime}
         initialDate={customDateTime || undefined}
       />
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f6fb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  keyboardView: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  card: {
+  formCard: {
     width: '100%',
     maxWidth: 500,
-    padding: 28,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    alignSelf: 'center',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  form: {
-    gap: 12,
-  },
-  input: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    color: COLORS.black,
-    fontSize: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: COLORS.gray,
-    marginBottom: 6,
+  centerCard: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    alignSelf: 'center',
   },
   datePickerButton: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f5f8fa',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(11, 90, 121, 0.1)',
   },
   datePickerButtonText: {
-    color: COLORS.black,
-    fontSize: 16,
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.textPrimary,
   },
-  clearDateButton: {
-    marginTop: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  clearDate: {
     alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingVertical: 4,
   },
-  clearDateButtonText: {
+  clearDateText: {
     color: COLORS.danger,
     fontSize: 13,
-    fontWeight: '500',
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  submitButton: {
-    backgroundColor: COLORS.primary,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
     fontWeight: '600',
-  },
-  successCard: {
-    width: '90%',
-    maxWidth: 500,
-    padding: 28,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
   },
   successName: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.black,
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: 16,
     marginBottom: 4,
-  },
-  successId: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 16,
-  },
-  successMessage: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.success,
-    marginBottom: 20,
     textAlign: 'center',
   },
-  newCheckInButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+  successId: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
   },
-  newCheckInButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
+  successMessage: {
+    fontSize: 17,
     fontWeight: '600',
-  },
-  loadingCard: {
-    width: '90%',
-    maxWidth: 500,
-    padding: 40,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: COLORS.black,
-    marginTop: 16,
-    fontWeight: '500',
+    color: COLORS.success,
+    marginBottom: 24,
+    textAlign: 'center',
   },
 });
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { View, StyleSheet } from 'react-native';
+import { NavigationContainer, DefaultTheme, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
+import { SplashScreen } from '../components';
+import { BRAND_TEAL } from '../theme/brand';
 import { getUser } from '../utils';
 import {
   LoginScreen,
@@ -21,130 +23,161 @@ import {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const navTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: BRAND_TEAL,
+    card: BRAND_TEAL,
+  },
+};
+
 const AppNavigator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [splashVisible, setSplashVisible] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const checkLoginStatus = async () => {
+      try {
+        const user = await getUser();
+        if (!cancelled) {
+          setIsLoggedIn(!!user?.id);
+        }
+      } catch {
+        if (!cancelled) {
+          setIsLoggedIn(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     checkLoginStatus();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const checkLoginStatus = async () => {
-    try {
-      const user = await getUser();
-      setIsLoggedIn(!!user?.id);
-    } catch (error) {
-      setIsLoggedIn(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  const showSplash = isLoading || splashVisible;
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName={isLoggedIn ? 'Dashboard' : 'Login'}
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      >
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen
-          name="CheckIn"
-          component={CheckInScreen}
-          options={{
-            headerShown: true,
-            headerTitle: 'Check In',
-            headerBackTitle: 'Back',
-            headerStyle: {
-              backgroundColor: COLORS.white,
-            },
-            headerTintColor: COLORS.primary,
-          }}
-        />
-        <Stack.Screen
-          name="RegisterUser"
-          component={RegisterUserScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="Reports"
-          component={ReportsScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="AddEvent"
-          component={AddEventScreen}
-          options={{
-            headerShown: true,
-            headerTitle: 'Add Event',
-            headerBackTitle: 'Back',
-            headerStyle: {
-              backgroundColor: COLORS.white,
-            },
-            headerTintColor: COLORS.primary,
-          }}
-        />
-        <Stack.Screen
-          name="ManageEvents"
-          component={ManageEventsScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="GenerateQR"
-          component={GenerateQRScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="QRScanner"
-          component={QRScannerScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="UserManagement"
-          component={UserManagementScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="BackdatedAttendance"
-          component={BackdatedAttendanceScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <View style={styles.root}>
+      {!isLoading ? (
+        <NavigationContainer
+          theme={navTheme}
+          onReady={() => setSplashVisible(false)}
+        >
+          <Stack.Navigator
+            initialRouteName={isLoggedIn ? 'Dashboard' : 'Login'}
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: BRAND_TEAL },
+            }}
+          >
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen
+              name="CheckIn"
+              component={CheckInScreen}
+              options={{
+                headerShown: true,
+                headerTitle: 'Check In',
+                headerBackTitle: 'Back',
+                headerStyle: {
+                  backgroundColor: COLORS.white,
+                },
+                headerTintColor: '#0b5a79',
+              }}
+            />
+            <Stack.Screen
+              name="RegisterUser"
+              component={RegisterUserScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="Reports"
+              component={ReportsScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="AddEvent"
+              component={AddEventScreen}
+              options={{
+                headerShown: true,
+                headerTitle: 'Add Event',
+                headerBackTitle: 'Back',
+                headerStyle: {
+                  backgroundColor: COLORS.white,
+                },
+                headerTintColor: '#0b5a79',
+              }}
+            />
+            <Stack.Screen
+              name="ManageEvents"
+              component={ManageEventsScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="GenerateQR"
+              component={GenerateQRScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="QRScanner"
+              component={QRScannerScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="UserManagement"
+              component={UserManagementScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="BackdatedAttendance"
+              component={BackdatedAttendanceScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      ) : null}
+      {showSplash ? (
+        <View style={styles.splashOverlay}>
+          <SplashScreen />
+        </View>
+      ) : null}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  root: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: BRAND_TEAL,
+  },
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
   },
 });
 

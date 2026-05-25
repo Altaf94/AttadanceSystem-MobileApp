@@ -24,6 +24,9 @@ import {
 } from '../constants';
 import { fetchEvents, submitCheckIn, fetchServices } from '../services/api';
 import { getUser, removeUser, isAdmin, isSpecialUser, parseQrPayload, getPakistanTime } from '../utils';
+import { ScreenLayout, ScreenHeader, Icon, AppConfirmModal } from '../components';
+import { screenStyles } from '../theme/screenStyles';
+import { BRAND_BUTTON_GRADIENT } from '../theme/brand';
 
 type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
@@ -43,6 +46,8 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [lastAttendance, setLastAttendance] = useState<LastAttendance | null>(null);
   const [hasCheckedUpdate, setHasCheckedUpdate] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   
   // Dynamic service units from API
   const [serviceUnits, setServiceUnits] = useState<ServiceUnitItem[]>([]);
@@ -111,8 +116,9 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
     setHasCheckedUpdate(true);
-    checkForUpdate(UpdateFlow.FLEXIBLE).catch(error => {
-      console.log('In-app update check failed:', error?.message || error);
+    checkForUpdate(UpdateFlow.FLEXIBLE).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log('In-app update check failed:', message);
     });
   }, [hasCheckedUpdate]);
 
@@ -125,21 +131,24 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }, [loadUserData, loadOccasions, loadServiceUnits, checkInAppUpdate])
   );
 
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await removeUser();
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
-        },
-      },
-    ]);
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await removeUser();
+      setShowLogoutConfirm(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setLogoutLoading(false);
+    }
   };
 
   const handleScanQR = () => {
@@ -174,30 +183,39 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const logoutModal = (
+    <AppConfirmModal
+      visible={showLogoutConfirm}
+      title="Logout"
+      message="Are you sure you want to logout? You will need to sign in again."
+      variant="logout"
+      confirmText="Logout"
+      cancelText="Cancel"
+      loading={logoutLoading}
+      onConfirm={confirmLogout}
+      onCancel={() => {
+        if (!logoutLoading) {
+          setShowLogoutConfirm(false);
+        }
+      }}
+    />
+  );
+
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Loading..." />;
   }
 
   // Admin Dashboard
   if (isUserAdmin) {
     return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.card}>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.headerTitle}>Admin Dashboard</Text>
-                <Text style={styles.headerSubtitle}>Welcome - {user?.email}</Text>
-              </View>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutButtonText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
+      <>
+      <ScreenLayout>
+          <View style={screenStyles.card}>
+            <ScreenHeader
+              title="Admin Dashboard"
+              subtitle={`Welcome — ${user?.email}`}
+              onLogout={handleLogout}
+            />
 
             <View style={styles.adminGrid}>
               <TouchableOpacity
@@ -205,7 +223,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('RegisterUser')}
               >
                 <LinearGradient
-                  colors={['#667eea', '#764ba2']}
+                  colors={[...BRAND_BUTTON_GRADIENT]}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>👤</Text>
@@ -219,7 +237,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('Reports')}
               >
                 <LinearGradient
-                  colors={['#f093fb', '#f5576c']}
+                  colors={['#1a8fb5', '#0b5a79']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>📊</Text>
@@ -233,7 +251,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('AddEvent')}
               >
                 <LinearGradient
-                  colors={['#8e44ad', '#3498db']}
+                  colors={['#2980b9', '#1a5276']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>📅</Text>
@@ -247,7 +265,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('ManageEvents')}
               >
                 <LinearGradient
-                  colors={['#e74c3c', '#c0392b']}
+                  colors={['#c0392b', '#922b21']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>🗑️</Text>
@@ -261,7 +279,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('GenerateQR')}
               >
                 <LinearGradient
-                  colors={['#f39c12', '#e74c3c']}
+                  colors={['#d68910', '#b7950b']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>📱</Text>
@@ -275,7 +293,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('UserManagement')}
               >
                 <LinearGradient
-                  colors={['#1abc9c', '#16a085']}
+                  colors={['#16a085', '#0e6655']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>👥</Text>
@@ -289,7 +307,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigation.navigate('BackdatedAttendance')}
               >
                 <LinearGradient
-                  colors={['#9b59b6', '#8e44ad']}
+                  colors={['#7d3c98', '#5b2c6f']}
                   style={styles.adminCardGradient}
                 >
                   <Text style={styles.adminCardIcon}>⏪</Text>
@@ -299,8 +317,9 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
-      </View>
+      </ScreenLayout>
+      {logoutModal}
+      </>
     );
   }
 
@@ -312,33 +331,27 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
       : DAY_TYPE_OPTIONS;
 
     return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.card}>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.headerTitle}>Attendance Scanner</Text>
-                <Text style={styles.headerSubtitle}>Welcome, {user?.name || user?.email}</Text>
-              </View>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutButtonText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
+      <>
+      <ScreenLayout>
+          <View style={screenStyles.card}>
+            <ScreenHeader
+              title="Attendance Scanner"
+              subtitle={`Welcome, ${user?.name || user?.email}`}
+              onLogout={handleLogout}
+            />
 
-            {/* Service Unit Selection */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Select Service Unit</Text>
+              <Text style={screenStyles.sectionTitle}>Select Service Unit</Text>
               {serviceUnitsLoading ? (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <View style={styles.optionsContainer}>
-                  {/* Use dynamic service units from API, fallback to hardcoded constants */}
+                <View style={screenStyles.optionsContainer}>
                   {(serviceUnits.length > 0 ? serviceUnits.map(u => u.name) : SERVICE_UNIT_OPTIONS).map(unit => (
                     <TouchableOpacity
                       key={unit}
                       style={[
-                        styles.optionButton,
-                        selectedServiceUnit === unit && styles.optionButtonSelected,
+                        screenStyles.optionButton,
+                        selectedServiceUnit === unit && screenStyles.optionButtonSelected,
                       ]}
                       onPress={() => {
                         setSelectedServiceUnit(unit);
@@ -347,8 +360,8 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                     >
                       <Text
                         style={[
-                          styles.optionButtonText,
-                          selectedServiceUnit === unit && styles.optionButtonTextSelected,
+                          screenStyles.optionButtonText,
+                          selectedServiceUnit === unit && screenStyles.optionButtonTextSelected,
                         ]}
                       >
                         {unit}
@@ -359,11 +372,10 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
 
-            {/* Service Selection */}
             {selectedServiceUnit && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select Service</Text>
-                <View style={styles.optionsContainer}>
+                <Text style={screenStyles.sectionTitle}>Select Service</Text>
+                <View style={screenStyles.optionsContainer}>
                   {/* Use dynamic services from API, fallback to hardcoded constants */}
                   {(() => {
                     const dynamicUnit = serviceUnits.find(u => u.name === selectedServiceUnit);
@@ -374,15 +386,15 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                       <TouchableOpacity
                         key={service}
                         style={[
-                          styles.optionButton,
-                          selectedService === service && styles.optionButtonSelectedGreen,
+                          screenStyles.optionButton,
+                          selectedService === service && screenStyles.optionButtonSelectedGreen,
                         ]}
                         onPress={() => setSelectedService(service)}
                       >
                         <Text
                           style={[
-                            styles.optionButtonText,
-                            selectedService === service && styles.optionButtonTextSelected,
+                            screenStyles.optionButtonText,
+                            selectedService === service && screenStyles.optionButtonTextSelected,
                           ]}
                         >
                           {service}
@@ -394,24 +406,23 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
 
-            {/* Occasion Selection */}
             {selectedService && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select Occasion</Text>
-                <View style={styles.optionsContainer}>
+                <Text style={screenStyles.sectionTitle}>Select Occasion</Text>
+                <View style={screenStyles.optionsContainer}>
                   {availableOccasions.map(opt => (
                     <TouchableOpacity
                       key={opt.value}
                       style={[
-                        styles.optionButton,
-                        selectedOccasion === opt.value && styles.optionButtonSelected,
+                        screenStyles.optionButton,
+                        selectedOccasion === opt.value && screenStyles.optionButtonSelected,
                       ]}
                       onPress={() => setSelectedOccasion(opt.value)}
                     >
                       <Text
                         style={[
-                          styles.optionButtonText,
-                          selectedOccasion === opt.value && styles.optionButtonTextSelected,
+                          screenStyles.optionButtonText,
+                          selectedOccasion === opt.value && screenStyles.optionButtonTextSelected,
                         ]}
                       >
                         {opt.label}
@@ -422,7 +433,6 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
 
-            {/* Open Camera Button */}
             {canOpenCamera && (
               <TouchableOpacity
                 style={styles.scanButton}
@@ -430,7 +440,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={checkinLoading}
               >
                 <LinearGradient
-                  colors={['#3498db', '#2980b9']}
+                  colors={[...BRAND_BUTTON_GRADIENT]}
                   style={styles.scanButtonGradient}
                 >
                   {checkinLoading ? (
@@ -442,9 +452,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             )}
           </View>
-        </ScrollView>
 
-        {/* Last Attendance Modal */}
         <Modal
           visible={!!lastAttendance}
           transparent
@@ -456,7 +464,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={1}
             onPress={() => setLastAttendance(null)}
           >
-            <View style={styles.attendanceModal}>
+            <View style={screenStyles.modalCard}>
               <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setLastAttendance(null)}
@@ -471,237 +479,163 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
         </Modal>
-      </View>
+      </ScreenLayout>
+      {logoutModal}
+      </>
     );
   }
 
-  // Regular User Dashboard
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Dashboard</Text>
-              <Text style={styles.headerSubtitle}>Volunteer Attendance System</Text>
-            </View>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
+    <>
+    <ScreenLayout centered contentContainerStyle={dashboardStyles.scrollCenter}>
+      <View style={[screenStyles.card, dashboardStyles.card]}>
+        <ScreenHeader
+          title="Dashboard"
+          subtitle="Volunteer Attendance System"
+          onLogout={handleLogout}
+        />
+
+        <View style={styles.section}>
+          <Text style={screenStyles.sectionTitle}>Select Occasion</Text>
+          <View style={screenStyles.optionsContainer}>
+            {(occasionOptions.length > 0 ? occasionOptions : DAY_TYPE_OPTIONS.map(o => o.label)).map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[
+                  screenStyles.optionButton,
+                  selectedOccasion === opt && screenStyles.optionButtonSelected,
+                ]}
+                onPress={() => setSelectedOccasion(opt)}
+              >
+                <Text
+                  style={[
+                    screenStyles.optionButtonText,
+                    selectedOccasion === opt && screenStyles.optionButtonTextSelected,
+                  ]}
+                >
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.actionContainer}>
+          <View style={styles.actionCard}>
+            <Icon name="qr-code-outline" size={32} color="#0b5a79" family="ionicons" />
+            <Text style={styles.actionTitle}>Scan QR Code</Text>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                (!selectedOccasion || checkinLoading) && styles.actionButtonDisabled,
+              ]}
+              onPress={handleScanQR}
+              disabled={!selectedOccasion || checkinLoading}
+              activeOpacity={0.85}
+            >
+              {checkinLoading ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <Text style={styles.actionButtonText}>Scan QR</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          {/* Occasion Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Occasion</Text>
-            <View style={styles.optionsContainer}>
-              {(occasionOptions.length > 0 ? occasionOptions : DAY_TYPE_OPTIONS.map(o => o.label)).map(opt => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.optionButton,
-                    selectedOccasion === opt && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedOccasion(opt)}
-                >
-                  <Text
-                    style={[
-                      styles.optionButtonText,
-                      selectedOccasion === opt && styles.optionButtonTextSelected,
-                    ]}
-                  >
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actionContainer}>
-            <View style={styles.actionCard}>
-              <Text style={styles.actionTitle}>Scan QR Code</Text>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  !selectedOccasion && styles.actionButtonDisabled,
-                ]}
-                onPress={handleScanQR}
-                disabled={!selectedOccasion || checkinLoading}
-              >
-                <Text style={styles.actionButtonText}>
-                  {checkinLoading ? 'Processing...' : 'Scan QR'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.actionCard}>
-              <Text style={styles.actionTitle}>Manual Check-in</Text>
-              <TouchableOpacity
-                style={[
-                  styles.actionButtonGreen,
-                  !selectedOccasion && styles.actionButtonDisabled,
-                ]}
-                onPress={handleManualCheckIn}
-                disabled={!selectedOccasion}
-              >
-                <Text style={styles.actionButtonText}>Manual Scan</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.actionCard}>
+            <Icon name="create-outline" size={32} color={COLORS.success} family="ionicons" />
+            <Text style={styles.actionTitle}>Manual Check-in</Text>
+            <TouchableOpacity
+              style={[
+                styles.actionButtonGreen,
+                !selectedOccasion && styles.actionButtonDisabled,
+              ]}
+              onPress={handleManualCheckIn}
+              disabled={!selectedOccasion}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionButtonText}>Manual Scan</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </ScreenLayout>
+    {logoutModal}
+    </>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: COLORS.gray,
-    fontSize: 16,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 40,
+const dashboardStyles = StyleSheet.create({
+  scrollCenter: {
+    paddingVertical: 28,
   },
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 5,
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  logoutButton: {
-    backgroundColor: COLORS.danger,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  logoutButtonText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 14,
-  },
+});
+
+const styles = StyleSheet.create({
   section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-    marginBottom: 12,
-  },
-  optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  optionButton: {
-    backgroundColor: COLORS.cardBackground,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#ddd',
-  },
-  optionButtonSelected: {
-    backgroundColor: '#e5f0ff',
-    borderColor: COLORS.primary,
-  },
-  optionButtonSelectedGreen: {
-    backgroundColor: '#e9f8ef',
-    borderColor: COLORS.success,
-  },
-  optionButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.darkGray,
-  },
-  optionButtonTextSelected: {
-    color: COLORS.primary,
+    marginBottom: 22,
   },
   actionContainer: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
   },
   actionCard: {
     flex: 1,
-    backgroundColor: '#ecf0f1',
+    backgroundColor: '#f0f7fa',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 18,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 148,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(11, 90, 121, 0.1)',
   },
   actionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.darkGray,
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginVertical: 10,
   },
   actionButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 6,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    width: '100%',
+    backgroundColor: '#0b5a79',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   actionButtonGreen: {
+    width: '100%',
     backgroundColor: COLORS.success,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 6,
-    shadowColor: COLORS.success,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   actionButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.45,
   },
   actionButtonText: {
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
   },
   scanButton: {
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
     marginTop: 20,
+    shadowColor: '#0b5a79',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
   scanButtonGradient: {
     padding: 16,
@@ -719,7 +653,7 @@ const styles = StyleSheet.create({
   },
   adminCard: {
     width: '47%',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -748,24 +682,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  attendanceModal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 28,
-    minWidth: 300,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 10,
-  },
+  modalOverlay: screenStyles.modalOverlay,
   modalCloseButton: {
     position: 'absolute',
     right: 12,

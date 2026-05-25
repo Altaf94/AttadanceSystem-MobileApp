@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -13,6 +12,8 @@ import { RootStackParamList, EventItem } from '../types';
 import { COLORS } from '../constants';
 import { fetchEventsWithId, deleteEvent } from '../services/api';
 import { getUser, isAdmin } from '../utils';
+import { ScreenLayout, ScreenHeader, PrimaryButton, Icon } from '../components';
+import { screenStyles } from '../theme/screenStyles';
 
 type ManageEventsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageEvents'>;
 
@@ -89,57 +90,38 @@ const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Loading..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access Denied</Text>
-        <Text style={styles.accessDeniedText}>Only admins can manage events.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Text style={styles.backButtonText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="lock-closed-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>Only admins can manage events.</Text>
+            <PrimaryButton title="Back to Dashboard" onPress={() => navigation.navigate('Dashboard')} />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Manage Events</Text>
-            <TouchableOpacity
-              style={styles.headerBackButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.headerBackButtonText}>Back</Text>
-            </TouchableOpacity>
-          </View>
+    <ScreenLayout>
+        <View style={screenStyles.card}>
+          <ScreenHeader title="Manage Events" subtitle="View and delete occasions" onBack={() => navigation.goBack()} />
 
           {loading ? (
             <View style={styles.loadingSection}>
               <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Loading events...</Text>
+              <Text style={screenStyles.loadingText}>Loading events...</Text>
             </View>
           ) : events.length === 0 ? (
             <View style={styles.emptySection}>
               <Text style={styles.emptyText}>No events found.</Text>
-              <TouchableOpacity
-                style={styles.addEventButton}
-                onPress={() => navigation.navigate('AddEvent')}
-              >
-                <Text style={styles.addEventButtonText}>Add Event</Text>
-              </TouchableOpacity>
+              <PrimaryButton title="Add Event" icon="add-circle-outline" onPress={() => navigation.navigate('AddEvent')} />
             </View>
           ) : (
             <View style={styles.eventList}>
@@ -148,7 +130,7 @@ const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                 const isDeleting = deletingId === event.id;
 
                 return (
-                  <View key={event.id} style={styles.eventItem}>
+                  <View key={event.id} style={[styles.eventItem, screenStyles.cardCompact]}>
                     <View style={styles.eventInfo}>
                       <Text style={styles.eventName}>{event.occasion}</Text>
                       <View
@@ -183,92 +165,11 @@ const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
         </View>
-      </ScrollView>
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: COLORS.gray,
-    fontSize: 16,
-  },
-  accessDenied: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: COLORS.background,
-  },
-  accessDeniedTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.danger,
-    marginBottom: 8,
-  },
-  accessDeniedText: {
-    fontSize: 16,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: COLORS.white,
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 5,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  headerBackButton: {
-    backgroundColor: COLORS.lightGray,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  headerBackButtonText: {
-    color: COLORS.textPrimary,
-    fontWeight: '600',
-  },
   loadingSection: {
     padding: 40,
     alignItems: 'center',
@@ -282,17 +183,6 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginBottom: 16,
   },
-  addEventButton: {
-    backgroundColor: '#8e44ad',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  addEventButtonText: {
-    color: COLORS.white,
-    fontWeight: '600',
-    fontSize: 16,
-  },
   eventList: {
     gap: 12,
   },
@@ -300,11 +190,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    marginBottom: 0,
   },
   eventInfo: {
     flex: 1,

@@ -55,6 +55,10 @@ export const DAY_TYPE_OPTIONS = [
 
 export const SPECIAL_USER_EMAILS = ["noorabaddefault@gmail.com"];
 
+// Brand (aligned with login screen)
+export const BRAND_TEAL = '#0b5a79';
+export const BRAND_TEAL_LIGHT = '#1a8fb5';
+
 // Colors
 export const COLORS = {
   primary: '#3498db',

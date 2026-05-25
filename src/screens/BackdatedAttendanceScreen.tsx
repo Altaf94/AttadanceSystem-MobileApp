@@ -16,6 +16,10 @@ import { COLORS } from '../constants';
 import { fetchEvents, submitCheckIn } from '../services/api';
 import { getUser, isAdmin, parseQrPayload } from '../utils';
 import DateTimePicker from '../components/DateTimePicker';
+import { ScreenLayout, ScreenHeader, PrimaryButton, Icon } from '../components';
+import { screenStyles } from '../theme/screenStyles';
+import { BRAND_BUTTON_GRADIENT } from '../theme/brand';
+import LinearGradient from 'react-native-linear-gradient';
 
 type BackdatedAttendanceScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'BackdatedAttendance'>;
 
@@ -28,6 +32,8 @@ interface LastAttendance {
   volunteerName: string;
   time: string;
 }
+
+const SCAN_COOLDOWN_MS = 2500;
 
 const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
   const [isUserAdmin, setIsUserAdmin] = useState<boolean | null>(null);
@@ -47,15 +53,27 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
   const [hasPermission, setHasPermission] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [processingQR, setProcessingQR] = useState(false);
+  const [cooldownActive, setCooldownActive] = useState(false);
   const [lastAttendance, setLastAttendance] = useState<LastAttendance | null>(null);
   const [torchOn, setTorchOn] = useState(false);
-  
+
   const scannedRef = useRef(false);
+  const showScannerRef = useRef(false);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const device = useCameraDevice('back');
+
+  useEffect(() => {
+    showScannerRef.current = showScanner;
+  }, [showScanner]);
 
   useEffect(() => {
     checkAdminAccess();
     loadOccasions();
+    return () => {
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current);
+      }
+    };
   }, []);
 
   const checkAdminAccess = async () => {
@@ -119,23 +137,49 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const closeScanner = () => {
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
+    }
     setShowScanner(false);
     setIsActive(false);
     scannedRef.current = false;
     setProcessingQR(false);
+    setCooldownActive(false);
     setTorchOn(false);
+  };
+
+  const beginScanCooldown = () => {
+    setIsActive(false);
+    scannedRef.current = true;
+    setProcessingQR(false);
+    setCooldownActive(true);
+
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+    }
+
+    cooldownTimerRef.current = setTimeout(() => {
+      setCooldownActive(false);
+      scannedRef.current = false;
+      cooldownTimerRef.current = null;
+      if (showScannerRef.current) {
+        setIsActive(true);
+      }
+    }, SCAN_COOLDOWN_MS);
   };
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (processingQR || scannedRef.current || !isActive) {
+      if (processingQR || scannedRef.current || !isActive || cooldownActive) {
         return;
       }
 
       if (codes.length > 0 && codes[0].value) {
         scannedRef.current = true;
         setProcessingQR(true);
+        setIsActive(false);
         processQRCode(codes[0].value);
       }
     },
@@ -206,8 +250,7 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Backdated check-in failed';
       Alert.alert('Error', errorMessage);
-      scannedRef.current = false;
-      setProcessingQR(false);
+      beginScanCooldown();
     }
   };
 
@@ -222,54 +265,41 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
     return `${year}-${month}-${day} at ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
   };
 
-  const canOpenScanner = selectedDate && selectedOccasion && !processingQR;
+  const canOpenScanner = selectedDate && selectedOccasion && !processingQR && !cooldownActive;
 
   if (isUserAdmin === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <ScreenLayout loading loadingText="Loading..." />;
   }
 
   if (!isUserAdmin) {
     return (
-      <View style={styles.accessDenied}>
-        <Text style={styles.accessDeniedTitle}>Access Denied</Text>
-        <Text style={styles.accessDeniedText}>Only admins can use backdated attendance.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Text style={styles.backButtonText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenLayout centered>
+        <View style={screenStyles.card}>
+          <View style={screenStyles.accessDeniedCard}>
+            <Icon name="time-outline" size={48} color={COLORS.danger} family="ionicons" />
+            <Text style={[screenStyles.screenTitle, { marginTop: 16 }]}>Access denied</Text>
+            <Text style={screenStyles.accessDeniedText}>
+              Only admins can use backdated attendance.
+            </Text>
+            <PrimaryButton title="Back to Dashboard" onPress={() => navigation.navigate('Dashboard')} />
+          </View>
+        </View>
+      </ScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Backdated Attendance</Text>
-              <Text style={styles.headerSubtitle}>
-                Select the date and time, then scan QR code
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.headerBackButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.headerBackButtonText}>Back</Text>
-            </TouchableOpacity>
-          </View>
+    <ScreenLayout>
+        <View style={screenStyles.card}>
+          <ScreenHeader
+            title="Backdated Attendance"
+            subtitle="Select date, time, and occasion, then scan QR"
+            onBack={() => navigation.goBack()}
+          />
 
           {/* Date/Time Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Date & Time</Text>
+            <Text style={screenStyles.label}>Date & Time</Text>
             <TouchableOpacity
               style={styles.selectButton}
               onPress={() => setShowDatePicker(true)}
@@ -285,7 +315,7 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Occasion Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Occasion</Text>
+            <Text style={screenStyles.label}>Occasion</Text>
             <TouchableOpacity
               style={styles.selectButton}
               onPress={() => setShowOccasionPicker(true)}
@@ -301,14 +331,14 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Open Scanner Button */}
           <TouchableOpacity
-            style={[
-              styles.scannerButton,
-              !canOpenScanner && styles.scannerButtonDisabled
-            ]}
+            style={[styles.scannerButton, !canOpenScanner && styles.scannerButtonDisabled]}
             onPress={openScanner}
             disabled={!canOpenScanner}
+            activeOpacity={0.85}
           >
-            <Text style={styles.scannerButtonText}>📷 Open QR Scanner</Text>
+            <LinearGradient colors={[...BRAND_BUTTON_GRADIENT]} style={styles.scannerButtonGradient}>
+              <Text style={styles.scannerButtonText}>Open QR Scanner</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Selection Summary */}
@@ -337,7 +367,6 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
         </View>
-      </ScrollView>
 
       {/* Date Picker - It already includes a Modal */}
       <DateTimePicker
@@ -462,39 +491,27 @@ const BackdatedAttendanceScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.processingText}>Processing...</Text>
               </View>
             )}
+
+            {cooldownActive && !processingQR && (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator size="large" color="#fff" />
+                <Text style={styles.processingText}>
+                  Camera paused — ready to scan again in a moment…
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
   loadingText: {
     marginTop: 10,
     color: COLORS.gray,
     fontSize: 16,
-  },
-  accessDenied: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: COLORS.background,
   },
   accessDeniedTitle: {
     fontSize: 24,
@@ -565,11 +582,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectButton: {
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(11, 90, 121, 0.12)',
+    borderRadius: 12,
     padding: 14,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#f5f8fa',
+    marginBottom: 8,
   },
   selectButtonText: {
     fontSize: 16,
@@ -579,19 +597,21 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
   },
   scannerButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
     marginTop: 8,
   },
+  scannerButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
   scannerButtonDisabled: {
-    backgroundColor: '#b7c4d6',
+    opacity: 0.5,
   },
   scannerButtonText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 17,
   },
   summaryBox: {
     marginTop: 20,
