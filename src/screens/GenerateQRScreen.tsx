@@ -177,7 +177,7 @@ const GenerateQRScreen: React.FC<Props> = ({ navigation }) => {
 
             <ScrollView contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.qrSection}>
-                {qrValue && <QRCodeDisplay value={qrValue} size={250} />}
+                {qrValue && <QRCodeDisplay value={qrValue} size={150} />}
               </View>
 
               <View style={styles.volunteerInfo}>
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   doneButton: {
-    flex: 1,
+    // flex: 1,
     backgroundColor: COLORS.success,
     padding: 14,
     borderRadius: 8,

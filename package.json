@@ -1,6 +1,6 @@
 {
   "name": "Attandance",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run lint",
     "build:android": "cd android && ./gradlew assembleRelease",
+    "build:aab": "cd android && ./gradlew bundleRelease",
     "build:android:debug": "cd android && ./gradlew assembleDebug",
     "start": "react-native start",
     "test": "jest"
