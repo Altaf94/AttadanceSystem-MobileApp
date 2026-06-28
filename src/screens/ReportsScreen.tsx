@@ -585,9 +585,18 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.picker}
               >
                 <Picker.Item label="All Events" value="" />
-                {Array.from(new Set(data?.filters.events)).map((e, idx) => (
-                  <Picker.Item key={`event-${idx}`} label={e} value={e} />
-                ))}
+                {Array.from(new Set(data?.filters.events || []))
+                  .filter(event => {
+                    const shouldExclude = 
+                      event === 'WORKING_DAYS' || event === 'GENERAL_EVENT' ||
+                      event === 'Working Days' || event === 'General' ||
+                      event === 'WORKING DAYS' || event === 'GENERAL EVENT' ||
+                      event.includes('WORKING') || event.includes('GENERAL');
+                    return !shouldExclude;
+                  })
+                  .map((e, idx) => (
+                    <Picker.Item key={`event-${idx}`} label={e} value={e} />
+                  ))}
               </Picker>
             </View>
 
@@ -732,15 +741,32 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                 {/* Event Stats */}
                 <View style={styles.statsCard}>
                   <Text style={styles.statsTitle}>🗓️ Check-ins by Event</Text>
-                  {data.eventStats.slice(0, 5).map((event, index) => (
-                    <View key={`${event.name}-${index}`} style={styles.statsRow}>
-                      <Text style={styles.statsRank}>#{index + 1}</Text>
-                      <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
-                        {event.name}
-                      </Text>
-                      <Text style={styles.statsCount}>{event.count}</Text>
-                    </View>
-                  ))}
+                  {/* Debug: Log event names to console */}
+                  {(() => {
+                    console.log('Event stats from backend:', data.eventStats);
+                    return null;
+                  })()}
+                  {data.eventStats
+                    .filter(event => {
+                      console.log('Checking event:', event.name, 'type:', typeof event.name);
+                      const shouldExclude = 
+                        event.name === 'WORKING_DAYS' || event.name === 'GENERAL_EVENT' ||
+                        event.name === 'Working Days' || event.name === 'General' ||
+                        event.name === 'WORKING DAYS' || event.name === 'GENERAL EVENT' ||
+                        event.name.includes('WORKING') || event.name.includes('GENERAL');
+                      console.log('Should exclude event?', shouldExclude, 'for event:', event.name);
+                      return !shouldExclude;
+                    })
+                    .slice(0, 5)
+                    .map((event, index) => (
+                      <View key={`${event.name}-${index}`} style={styles.statsRow}>
+                        <Text style={styles.statsRank}>#{index + 1}</Text>
+                        <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
+                          {event.name}
+                        </Text>
+                        <Text style={styles.statsCount}>{event.count}</Text>
+                      </View>
+                    ))}
                 </View>
 
                 <View style={styles.statsCard}>
@@ -842,34 +868,73 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.eventsContainer}>
                 <View style={styles.statsCard}>
                   <Text style={styles.statsTitle}>🗓️ Check-ins by Event</Text>
-                  {data.eventStats.length === 0 && (
+                  {data.eventStats
+                    .filter(event => {
+                      const shouldExclude = 
+                        event.name === 'WORKING_DAYS' || event.name === 'GENERAL_EVENT' ||
+                        event.name === 'Working Days' || event.name === 'General' ||
+                        event.name === 'WORKING DAYS' || event.name === 'GENERAL EVENT' ||
+                        event.name.includes('WORKING') || event.name.includes('GENERAL');
+                      return !shouldExclude;
+                    })
+                    .length === 0 && (
                     <Text style={styles.emptyText}>No event data available.</Text>
                   )}
-                  {data.eventStats.map((event, index) => (
-                    <View key={`${event.name}-${index}`} style={styles.statsRow}>
-                      <Text style={styles.statsRank}>#{index + 1}</Text>
-                      <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
-                        {event.name}
-                      </Text>
-                      <Text style={styles.statsCount}>{event.count}</Text>
-                    </View>
-                  ))}
+                  {data.eventStats
+                    .filter(event => {
+                      const shouldExclude = 
+                        event.name === 'WORKING_DAYS' || event.name === 'GENERAL_EVENT' ||
+                        event.name === 'Working Days' || event.name === 'General' ||
+                        event.name === 'WORKING DAYS' || event.name === 'GENERAL EVENT' ||
+                        event.name.includes('WORKING') || event.name.includes('GENERAL');
+                      return !shouldExclude;
+                    })
+                    .map((event, index) => (
+                      <View key={`${event.name}-${index}`} style={styles.statsRow}>
+                        <Text style={styles.statsRank}>#{index + 1}</Text>
+                        <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
+                          {event.name}
+                        </Text>
+                        <Text style={styles.statsCount}>{event.count}</Text>
+                      </View>
+                    ))}
                 </View>
 
                 <View style={styles.statsCard}>
                   <Text style={styles.statsTitle}>📂 Check-ins by Category</Text>
-                  {data.categoryStats.length === 0 && (
+                  {/* Debug: Log category names to console */}
+                  {(() => {
+                    console.log('Category stats from backend:', data.categoryStats);
+                    return null;
+                  })()}
+                  {data.categoryStats.filter(cat => {
+                    console.log('Checking category:', cat.name, 'type:', typeof cat.name);
+                    const shouldExclude = 
+                      cat.name === 'WORKING_DAYS' || cat.name === 'GENERAL_EVENT' ||
+                      cat.name === 'Working Days' || cat.name === 'General' ||
+                      cat.name === 'WORKING DAYS' || cat.name === 'GENERAL EVENT';
+                    console.log('Should exclude?', shouldExclude, 'for category:', cat.name);
+                    return !shouldExclude;
+                  }).length === 0 && (
                     <Text style={styles.emptyText}>No category data available.</Text>
                   )}
-                  {data.categoryStats.map((cat, index) => (
-                    <View key={`${cat.name}-${index}`} style={styles.statsRow}>
-                      <Text style={styles.statsRank}>#{index + 1}</Text>
-                      <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
-                        {cat.name}
-                      </Text>
-                      <Text style={styles.statsCount}>{cat.count}</Text>
-                    </View>
-                  ))}
+                  {data.categoryStats
+                    .filter(cat => {
+                      const shouldExclude = 
+                        cat.name === 'WORKING_DAYS' || cat.name === 'GENERAL_EVENT' ||
+                        cat.name === 'Working Days' || cat.name === 'General' ||
+                        cat.name === 'WORKING DAYS' || cat.name === 'GENERAL EVENT';
+                      return !shouldExclude;
+                    })
+                    .map((cat, index) => (
+                      <View key={`${cat.name}-${index}`} style={styles.statsRow}>
+                        <Text style={styles.statsRank}>#{index + 1}</Text>
+                        <Text style={[styles.statsName, { flex: 1 }]} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                        <Text style={styles.statsCount}>{cat.count}</Text>
+                      </View>
+                    ))}
                 </View>
               </View>
             )}
@@ -999,9 +1064,18 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Event*" value="" />
-                  {(data?.filters.events || []).map((e, idx) => (
-                    <Picker.Item key={`add-event-${idx}`} label={e} value={e} />
-                  ))}
+                  {(data?.filters.events || [])
+                    .filter(event => {
+                      const shouldExclude = 
+                        event === 'WORKING_DAYS' || event === 'GENERAL_EVENT' ||
+                        event === 'Working Days' || event === 'General' ||
+                        event === 'WORKING DAYS' || event === 'GENERAL EVENT' ||
+                        event.includes('WORKING') || event.includes('GENERAL');
+                      return !shouldExclude;
+                    })
+                    .map((e, idx) => (
+                      <Picker.Item key={`add-event-${idx}`} label={e} value={e} />
+                    ))}
                 </Picker>
               </View>
               <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
@@ -1108,9 +1182,18 @@ const ReportsScreen: React.FC<Props> = ({ navigation }) => {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Event*" value="" />
-                  {(data?.filters.events || []).map((e, idx) => (
-                    <Picker.Item key={`edit-event-${idx}`} label={e} value={e} />
-                  ))}
+                  {(data?.filters.events || [])
+                    .filter(event => {
+                      const shouldExclude = 
+                        event === 'WORKING_DAYS' || event === 'GENERAL_EVENT' ||
+                        event === 'Working Days' || event === 'General' ||
+                        event === 'WORKING DAYS' || event === 'GENERAL EVENT' ||
+                        event.includes('WORKING') || event.includes('GENERAL');
+                      return !shouldExclude;
+                    })
+                    .map((e, idx) => (
+                      <Picker.Item key={`edit-event-${idx}`} label={e} value={e} />
+                    ))}
                 </Picker>
               </View>
               <View style={[styles.pickerContainer, { marginBottom: 12 }]}>
