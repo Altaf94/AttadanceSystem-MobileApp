@@ -44,6 +44,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [filter, setFilter] = useState<'SUBMITTED' | 'APPROVED'>('SUBMITTED');
 
   const selected = useMemo(
     () => requests.find(request => request.id === selectedId) || requests[0] || null,
@@ -55,7 +56,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
     return Object.entries(selected.serviceVolunteers).filter(([, value]) => String(value || '').trim());
   }, [selected]);
 
-  const loadRequests = useCallback(async (asRefresh = false) => {
+  const loadRequests = useCallback(async (status: 'SUBMITTED' | 'APPROVED' = filter, asRefresh = false) => {
     if (asRefresh) {
       setRefreshing(true);
     } else {
@@ -63,7 +64,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
     }
     setError('');
     try {
-      const data = await fetchServiceRequisitions('SUBMITTED');
+      const data = await fetchServiceRequisitions(status);
       setRequests(Array.isArray(data) ? data : []);
       setSelectedId(Array.isArray(data) && data[0]?.id ? data[0].id : null);
     } catch (err) {
@@ -72,13 +73,19 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [filter]);
 
   useFocusEffect(
     useCallback(() => {
-      loadRequests();
-    }, [loadRequests])
+      loadRequests(filter);
+    }, [loadRequests, filter])
   );
+
+  const handleFilterChange = (newFilter: 'SUBMITTED' | 'APPROVED') => {
+    if (newFilter === filter) return;
+    setFilter(newFilter);
+    loadRequests(newFilter);
+  };
 
   const [downloading, setDownloading] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -273,14 +280,33 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <ScreenLayout
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadRequests(true)} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadRequests(filter, true)} />}
     >
-      <View style={[screenStyles.card, { borderRadius: 0, padding: 12 }]}>
+      <View style={[screenStyles.card, { borderRadius: 10, padding: 12 }]}>
         <ScreenHeader
           title="Service Requisitions"
           subtitle="Review submitted requests"
           onBack={() => navigation.goBack()}
         />
+
+        <View style={styles.filterTabs}>
+          <TouchableOpacity
+            style={[styles.filterTab, filter === 'SUBMITTED' && styles.filterTabActive]}
+            onPress={() => handleFilterChange('SUBMITTED')}
+          >
+            <Text style={[styles.filterTabText, filter === 'SUBMITTED' && styles.filterTabTextActive]}>
+              Pending Approval
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterTab, filter === 'APPROVED' && styles.filterTabActive]}
+            onPress={() => handleFilterChange('APPROVED')}
+          >
+            <Text style={[styles.filterTabText, filter === 'APPROVED' && styles.filterTabTextActive]}>
+              Approved
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {loading ? (
           <View style={styles.center}>
@@ -294,7 +320,11 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         ) : requests.length === 0 ? (
           <View style={styles.center}>
-            <Text style={styles.muted}>No submitted service requisitions found.</Text>
+            <Text style={styles.muted}>
+              {filter === 'SUBMITTED'
+                ? 'No pending service requisitions found.'
+                : 'No approved service requisitions found.'}
+            </Text>
           </View>
         ) : (
           <>
@@ -441,13 +471,15 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
 
                 <View style={styles.actionButtons}>
-                  <PrimaryButton
-                    title={selected.status === 'APPROVED' ? 'Approved ✓' : 'Approve'}
-                    variant="secondary"
-                    onPress={handleApprove}
-                    loading={approving}
-                    disabled={approving || selected.status === 'APPROVED'}
-                  />
+                  {filter === 'SUBMITTED' && (
+                    <PrimaryButton
+                      title={selected.status === 'APPROVED' ? 'Approved ✓' : 'Approve'}
+                      variant="secondary"
+                      onPress={handleApprove}
+                      loading={approving}
+                      disabled={approving || selected.status === 'APPROVED'}
+                    />
+                  )}
                   <PrimaryButton
                     title="Download PDF"
                     variant="secondary"
@@ -481,8 +513,9 @@ const DetailField: React.FC<{ label: string; value: unknown }> = ({ label, value
 const styles = StyleSheet.create({
   content: {
     paddingBottom: 32,
-    alignItems: 'center',
-    paddingHorizontal: 4,
+    // alignItems: 'center',
+   
+    paddingHorizontal: 14,
   },
   center: {
     gap: 12,
@@ -714,6 +747,33 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 16,
     flexWrap: 'wrap',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dce4ec',
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+  },
+  filterTabActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.gray,
+  },
+  filterTabTextActive: {
+    color: '#fff',
   },
 });
 

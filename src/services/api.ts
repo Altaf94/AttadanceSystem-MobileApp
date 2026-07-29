@@ -286,7 +286,7 @@ export const fetchServiceRequisition = async (
 };
 
 export const fetchServiceRequisitions = async (
-  status: 'DRAFT' | 'SUBMITTED' = 'SUBMITTED'
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' = 'SUBMITTED'
 ): Promise<ServiceRequisition[]> => {
   return apiCall(`/api/service-requisitions?status=${status}`);
 };
