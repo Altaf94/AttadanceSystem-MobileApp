@@ -9,7 +9,7 @@ import React from 'react';
 import { StatusBar, LogBox, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation';
-import { ToastProvider } from './src/components';
+import { ToastProvider, InAppUpdateChecker } from './src/components';
 import { BRAND_TEAL } from './src/theme/brand';
 
 // Suppress known warnings
@@ -27,6 +27,7 @@ function App(): React.JSX.Element {
           translucent={false}
         />
         <ToastProvider>
+          <InAppUpdateChecker />
           <AppNavigator />
         </ToastProvider>
       </SafeAreaProvider>

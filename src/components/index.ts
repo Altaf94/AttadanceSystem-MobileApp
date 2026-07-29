@@ -11,3 +11,4 @@ export { ScreenLayout } from './ScreenLayout';
 export { ScreenHeader } from './ScreenHeader';
 export { FormField, PasswordField } from './FormField';
 export { PrimaryButton } from './PrimaryButton';
+export { default as InAppUpdateChecker } from './InAppUpdateChecker';

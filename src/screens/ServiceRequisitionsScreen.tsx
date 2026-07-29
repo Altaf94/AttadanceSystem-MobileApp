@@ -52,7 +52,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const volunteerEntries = useMemo(() => {
-    if (!selected?.serviceVolunteers) return [];
+    if (!selected?.serviceVolunteers || typeof selected.serviceVolunteers !== 'object') return [];
     return Object.entries(selected.serviceVolunteers).filter(([, value]) => String(value || '').trim());
   }, [selected]);
 
@@ -128,7 +128,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
     ].map(group => {
       const rows = group.items.map(item => {
         const key = `${group.title}:${item}`;
-        const vol = req.serviceVolunteers?.[key] || '';
+        const vol = String(req.serviceVolunteers?.[key] ?? '');
         const checked = vol.trim() ? 'on' : '';
         return `<div class="svc-row"><div class="cb"><span class="cbx ${checked}">&#9746;</span><span class="cbl">${item}</span></div><span class="svc-vol">${esc(vol)}</span></div>`;
       }).join('');
@@ -420,7 +420,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
                       </View>
                       {group.items.map(item => {
                         const key = `${group.title}:${item}`;
-                        const vol = selected.serviceVolunteers?.[key] || '';
+                        const vol = String(selected.serviceVolunteers?.[key] ?? '');
                         return (
                           <View key={key} style={styles.serviceRow}>
                             <View style={styles.checkboxItem}>

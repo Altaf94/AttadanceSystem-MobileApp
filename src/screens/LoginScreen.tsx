@@ -1,8 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import SpInAppUpdates, { IAUUpdateKind, StartUpdateOptions } from 'sp-react-native-in-app-updates';
-import DeviceInfo from 'react-native-device-info';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { loginUser } from '../services/api';
@@ -34,39 +32,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<LoginError | null>(null);
-  const [updateChecking, setUpdateChecking] = useState(Platform.OS === 'android');
-  const hasCheckedUpdate = useRef(false);
-
-  const checkInAppUpdate = useCallback(() => {
-    if (Platform.OS !== 'android' || hasCheckedUpdate.current) {
-      setUpdateChecking(false);
-      return;
-    }
-    hasCheckedUpdate.current = true;
-    const inAppUpdates = new SpInAppUpdates(false);
-    inAppUpdates
-      .checkNeedsUpdate({ curVersion: DeviceInfo.getVersion() })
-      .then((result) => {
-        if (result.shouldUpdate) {
-          const updateOptions: StartUpdateOptions = {
-            updateType: IAUUpdateKind.IMMEDIATE,
-          };
-          return inAppUpdates.startUpdate(updateOptions);
-        }
-      })
-      .catch((updateError: unknown) => {
-        const message =
-          updateError instanceof Error ? updateError.message : String(updateError);
-        console.log('In-app update check failed:', message);
-      })
-      .finally(() => {
-        setUpdateChecking(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    checkInAppUpdate();
-  }, [checkInAppUpdate]);
 
   const clearError = () => {
     if (error) setError(null);
@@ -163,8 +128,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           title="Sign In"
           icon="log-in-outline"
           onPress={handleLogin}
-          loading={loading || updateChecking}
-          disabled={updateChecking}
+          loading={loading}
         />
       </View>
 
