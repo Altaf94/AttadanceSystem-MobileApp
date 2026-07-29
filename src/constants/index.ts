@@ -91,4 +91,4 @@ export const COLORS = {
 // For development, you can use your local machine's IP address
 // For production, use your deployed API URL
 // Example: 'http://192.168.1.100:3000' (local) or 'https://your-api.vercel.app' (deployed)
-export const API_BASE_URL = 'https://qr-attendance-api-95f62209cfd8.herokuapp.com'; // Replace with your actual API URL
+export const API_BASE_URL = 'https://attendancesys-f0hpbsg5a2d6g4fh.eastus-01.azurewebsites.net'; // Replace with your actual API URL

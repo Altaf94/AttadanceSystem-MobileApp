@@ -26,7 +26,7 @@ react {
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
+    nodeExecutableAndArgs = ["/opt/homebrew/bin/node"]
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"
@@ -90,8 +90,8 @@ android {
         applicationId "com.attandance"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.0.8"
+        versionCode 12
+        versionName "1.1.1"
     }
     signingConfigs {
         debug {

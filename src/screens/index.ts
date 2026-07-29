@@ -9,3 +9,5 @@ export { default as GenerateQRScreen } from './GenerateQRScreen';
 export { default as QRScannerScreen } from './QRScannerScreen';
 export { default as UserManagementScreen } from './UserManagementScreen';
 export { default as BackdatedAttendanceScreen } from './BackdatedAttendanceScreen';
+export { default as ServiceRequisitionScreen } from './ServiceRequisitionScreen';
+export { default as ServiceRequisitionsScreen } from './ServiceRequisitionsScreen';

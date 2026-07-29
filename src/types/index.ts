@@ -85,6 +85,79 @@ export interface ServiceUnitItem {
   services: ServiceItem[];
 }
 
+export type ServiceRequisitionStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED';
+
+export interface ServiceRequisition {
+  id: string;
+  requestDate: string;
+  programTitle: string;
+  organisingInstitution: string | null;
+  collaboratingInstitutes: string | null;
+  invitedGuest: string | null;
+  eventDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  duration: string | null;
+  targetAudience: string | null;
+  ageGroup: string | null;
+  expectedGathering: string | null;
+  objectives: string | null;
+  venues: string[];
+  otherVenue: string | null;
+  chairsRequired: number | null;
+  requirements: string[];
+  otherRequirements: string | null;
+  servicesRequired: boolean;
+  serviceVolunteers: Record<string, string>;
+  tkService: string | null;
+  requestorName: string | null;
+  contactDetails: string | null;
+  mukhiSaheb: string | null;
+  kamadiaSaheb: string | null;
+  directorGent: string | null;
+  directorLadies: string | null;
+  rec: string | null;
+  studyCircle: string | null;
+  status: ServiceRequisitionStatus;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type ServiceRequisitionInput = {
+  id?: string | null;
+  status: ServiceRequisitionStatus;
+  chairsRequired?: string | number | null;
+  requestDate?: string | null;
+  programTitle: string;
+  organisingInstitution?: string | null;
+  collaboratingInstitutes?: string | null;
+  invitedGuest?: string | null;
+  eventDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  duration?: string | null;
+  targetAudience?: string | null;
+  ageGroup?: string | null;
+  expectedGathering?: string | null;
+  objectives?: string | null;
+  venues?: string[];
+  otherVenue?: string | null;
+  requirements?: string[];
+  otherRequirements?: string | null;
+  servicesRequired?: boolean;
+  serviceVolunteers?: Record<string, string>;
+  tkService?: string | null;
+  requestorName?: string | null;
+  contactDetails?: string | null;
+  mukhiSaheb?: string | null;
+  kamadiaSaheb?: string | null;
+  directorGent?: string | null;
+  directorLadies?: string | null;
+  rec?: string | null;
+  studyCircle?: string | null;
+};
+
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
@@ -106,4 +179,6 @@ export type RootStackParamList = {
   QRScanner: { event: string; service?: string; serviceUnit?: string };
   UserManagement: undefined;
   BackdatedAttendance: undefined;
+  ServiceRequisition: undefined;
+  ServiceRequisitions: undefined;
 };

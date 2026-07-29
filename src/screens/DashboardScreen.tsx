@@ -306,6 +306,20 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.adminCardSubtitle}>Record past attendance</Text>
                 </LinearGradient>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.adminCard}
+                onPress={() => navigation.navigate('ServiceRequisitions')}
+              >
+                <LinearGradient
+                  colors={['#2f7d6d', '#1f5f64']}
+                  style={styles.adminCardGradient}
+                >
+                  <Text style={styles.adminCardIcon}>📄</Text>
+                  <Text style={styles.adminCardTitle}>Service Requisitions</Text>
+                  <Text style={styles.adminCardSubtitle}>Review submitted requests</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
       </ScreenLayout>
@@ -512,6 +526,17 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <View style={styles.actionContainer}>
+          {/* <View style={styles.actionCard}>
+            <Icon name="document-text-outline" size={32} color="#0b5a79" family="ionicons" />
+            <Text style={styles.actionTitle}>Service Requisition</Text>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('ServiceRequisition')}
+            >
+              <Text style={styles.actionButtonText}>Open Form</Text>
+            </TouchableOpacity>
+          </View> */}
+
           <View style={styles.actionCard}>
             <Icon name="qr-code-outline" size={32} color="#0b5a79" family="ionicons" />
             <Text style={styles.actionTitle}>Scan QR Code</Text>

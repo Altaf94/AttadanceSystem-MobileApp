@@ -1,5 +1,13 @@
 import { API_BASE_URL } from '../constants';
-import { User, EventItem, ReportData, UserListItem, ServiceUnitItem } from '../types';
+import {
+  User,
+  EventItem,
+  ReportData,
+  UserListItem,
+  ServiceUnitItem,
+  ServiceRequisition,
+  ServiceRequisitionInput,
+} from '../types';
 
 const logApi = (label: string, data: Record<string, unknown>) => {
   if (__DEV__) {
@@ -25,6 +33,55 @@ const redactBodyForLog = (body: RequestInit['body']): unknown => {
   }
 };
 
+const readErrorPayload = async (
+  response: Response
+): Promise<{ message: string; payload: unknown }> => {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const payload = await response.json().catch(() => null);
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      'message' in payload &&
+      typeof payload.message === 'string'
+    ) {
+      return { message: payload.message, payload };
+    }
+    return {
+      message: `Request failed (${response.status})`,
+      payload,
+    };
+  }
+
+  const text = await response.text().catch(() => '');
+  const detail = text.replace(/\s+/g, ' ').trim().slice(0, 160);
+  const looksLikeHtml = /^\s*<!doctype html|^\s*<html/i.test(text);
+
+  if (response.status === 404 && looksLikeHtml) {
+    return {
+      message: `Endpoint not found (${response.status}): ${urlPath(response.url)}`,
+      payload: detail || null,
+    };
+  }
+
+  return {
+    message: detail
+      ? `Request failed (${response.status}): ${detail}`
+      : `Request failed (${response.status})`,
+    payload: detail || null,
+  };
+};
+
+const urlPath = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+};
+
 // Helper function for API calls
 const apiCall = async <T>(
   endpoint: string,
@@ -39,28 +96,40 @@ const apiCall = async <T>(
     body: redactBodyForLog(options.body),
   });
 
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch (error) {
+    logApi('network error', {
+      method,
+      url,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(
+      error instanceof Error
+        ? `Network request failed: ${error.message}`
+        : 'Network request failed'
+    );
+  }
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ message: 'Request failed' }));
+    const { message, payload } = await readErrorPayload(response);
     logApi('error response', {
       method,
       url,
       status: response.status,
       payload,
     });
-    throw new Error(
-      typeof payload.message === 'string' ? payload.message : 'Request failed'
-    );
+    throw new Error(message);
   }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
   logApi('success', { method, url, status: response.status });
   return data as T;
 };
@@ -208,4 +277,35 @@ export const updateCheckIn = async (
 // Services APIs (dynamic service units and services from database)
 export const fetchServices = async (): Promise<ServiceUnitItem[]> => {
   return apiCall('/api/services');
+};
+
+export const fetchServiceRequisition = async (
+  id: string
+): Promise<ServiceRequisition> => {
+  return apiCall(`/api/service-requisitions?id=${encodeURIComponent(id)}`);
+};
+
+export const fetchServiceRequisitions = async (
+  status: 'DRAFT' | 'SUBMITTED' = 'SUBMITTED'
+): Promise<ServiceRequisition[]> => {
+  return apiCall(`/api/service-requisitions?status=${status}`);
+};
+
+export const saveServiceRequisition = async (
+  data: ServiceRequisitionInput
+): Promise<ServiceRequisition & { emailSkipped?: boolean; emailError?: string | null }> => {
+  return apiCall('/api/service-requisitions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const approveServiceRequisition = async (
+  id: string,
+  approvedBy: string
+): Promise<ServiceRequisition> => {
+  return apiCall(`/api/service-requisitions/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ id, approvedBy }),
+  });
 };

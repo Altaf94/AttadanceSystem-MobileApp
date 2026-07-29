@@ -9,6 +9,7 @@ import {
   Text,
   ViewStyle,
   StyleProp,
+  RefreshControlProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -24,6 +25,7 @@ interface ScreenLayoutProps {
   loading?: boolean;
   loadingText?: string;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
@@ -34,6 +36,7 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
   loading = false,
   loadingText = 'Loading...',
   contentContainerStyle,
+  refreshControl,
 }) => {
   if (loading) {
     return (
@@ -57,6 +60,7 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
       contentContainerStyle={[scrollStyle, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>
