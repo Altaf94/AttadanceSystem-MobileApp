@@ -102,6 +102,7 @@ export interface ServiceRequisition {
   ageGroup: string | null;
   expectedGathering: string | null;
   objectives: string | null;
+  prfAttachment?: string | null;
   venues: string[];
   otherVenue: string | null;
   chairsRequired: number | null;
@@ -141,6 +142,7 @@ export type ServiceRequisitionInput = {
   ageGroup?: string | null;
   expectedGathering?: string | null;
   objectives?: string | null;
+  prfAttachment?: string | null;
   venues?: string[];
   otherVenue?: string | null;
   requirements?: string[];

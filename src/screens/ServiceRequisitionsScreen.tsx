@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  Image,
   View,
 } from 'react-native';
 import { generatePDF } from 'react-native-html-to-pdf';
@@ -89,6 +90,7 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
 
   const [downloading, setDownloading] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [downloadingAttachment, setDownloadingAttachment] = useState(false);
 
   const handleApprove = async () => {
     if (!selected || approving) return;
@@ -252,6 +254,45 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
     </body></html>`;
   };
 
+  const downloadAttachment = async () => {
+    if (!selected?.prfAttachment || downloadingAttachment) return;
+    setDownloadingAttachment(true);
+    try {
+      const uri = selected.prfAttachment;
+      let filePath = '';
+      let mimeType = 'image/jpeg';
+
+      if (uri.startsWith('data:')) {
+        const match = uri.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.*)$/);
+        if (!match) throw new Error('Unsupported attachment format.');
+        mimeType = match[1];
+        const ext = mimeType.split('/')[1].replace('+', '');
+        const base64 = match[2];
+        const dir = ReactNativeBlobUtil.fs.dirs.DownloadDir || ReactNativeBlobUtil.fs.dirs.DocumentDir;
+        filePath = `${dir}/PRF_${selected.id}.${ext}`;
+        await ReactNativeBlobUtil.fs.writeFile(filePath, base64, 'base64');
+      } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+        const res = await ReactNativeBlobUtil.config({
+          fileCache: true,
+          appendExt: 'jpg',
+        }).fetch('GET', uri);
+        filePath = res.path();
+      } else {
+        filePath = uri.replace('file://', '');
+      }
+
+      if (Platform.OS === 'android' && filePath) {
+        await ReactNativeBlobUtil.android.actionViewIntent(filePath, mimeType);
+      }
+      console.log('Attachment saved:', filePath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to download attachment.';
+      console.log('Attachment download failed:', message);
+    } finally {
+      setDownloadingAttachment(false);
+    }
+  };
+
   const downloadPdf = async () => {
     if (!selected || downloading) return;
     setDownloading(true);
@@ -376,6 +417,22 @@ const ServiceRequisitionsScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.borderedBox}>
                   <Text style={styles.docText}>{display(selected.objectives)}</Text>
                 </View>
+
+                {selected.prfAttachment ? (
+                  <>
+                    <SectionHeader title="PRF Attachment" />
+                    <View style={styles.borderedBox}>
+                      <Image source={{ uri: selected.prfAttachment }} style={styles.prfPreview} resizeMode="contain" />
+                      <PrimaryButton
+                        title="Download Attachment"
+                        variant="secondary"
+                        onPress={downloadAttachment}
+                        loading={downloadingAttachment}
+                        disabled={downloadingAttachment}
+                      />
+                    </View>
+                  </>
+                ) : null}
 
                 <SectionHeader title="Venue Required" />
                 <View style={styles.borderedBox}>
@@ -710,6 +767,12 @@ const styles = StyleSheet.create({
   serviceVol: {
     fontSize: 10,
     color: '#000',
+  },
+  prfPreview: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#f5f5f5',
+    marginBottom: 6,
   },
   sigLabel: {
     fontSize: 10,

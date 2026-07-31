@@ -3,6 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -146,6 +147,7 @@ const ServiceRequisitionScreen: React.FC<Props> = ({ navigation }) => {
   const [servicesRequired, setServicesRequired] = useState(true);
   const [serviceVolunteers, setServiceVolunteers] = useState<Record<string, string>>(emptyServiceState);
   const [requisitionId, setRequisitionId] = useState<string | null>(null);
+  const [prfAttachment, setPrfAttachment] = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(true);
   const [saving, setSaving] = useState<ServiceRequisitionStatus | null>(null);
 
@@ -196,6 +198,7 @@ const ServiceRequisitionScreen: React.FC<Props> = ({ navigation }) => {
         setRequirements(Array.isArray(data.requirements) ? data.requirements : []);
         setServicesRequired(data.servicesRequired !== false);
         setServiceVolunteers({ ...emptyServiceState(), ...(data.serviceVolunteers || {}) });
+        setPrfAttachment(data.prfAttachment || null);
       } catch {
         Alert.alert('Draft not loaded', 'Failed to load saved service requisition draft.');
       } finally {
@@ -307,6 +310,16 @@ const ServiceRequisitionScreen: React.FC<Props> = ({ navigation }) => {
             value={fields.objectives}
             onChangeText={v => updateField('objectives', v)}
           />
+        </View>
+
+        {/* PRF Attachment */}
+        <SectionHeader title="PRF Attachment" />
+        <View style={styles.borderedBox}>
+          {prfAttachment ? (
+            <Image source={{ uri: prfAttachment }} style={styles.prfImage} resizeMode="contain" />
+          ) : (
+            <Text style={styles.helper}>No attachment provided.</Text>
+          )}
         </View>
 
         {/* Venue Required */}
@@ -695,7 +708,13 @@ const styles = StyleSheet.create({
     color: '#000',
     textAlign: 'center',
   },
-  sigLabel: {
+    prfImage: {
+      width: '100%',
+      height: 200,
+      backgroundColor: '#f5f5f5',
+      marginBottom: 6,
+    },
+    sigLabel: {
     fontSize: 10,
     fontWeight: 'bold',
     color: '#000',
